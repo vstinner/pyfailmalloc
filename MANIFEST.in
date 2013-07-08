@@ -1,0 +1,7 @@
+include COPYING
+include MANIFEST.in
+include README.rst
+
+include Makefile
+
+include test_failmalloc.py
