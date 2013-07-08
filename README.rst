@@ -11,6 +11,8 @@ memory allocators*" and so requires at least Python 3.4.
 
 Homepage: http://pypi.python.org/pypi/pyfailmalloc
 
+Source code: https://bitbucket.org/haypo/pyfailmalloc
+
 
 API
 ===
