@@ -1,0 +1,294 @@
+diff -r 3a0be81db97c Lib/test/regrtest.py
+--- a/Lib/test/regrtest.py	Tue Jul 16 03:26:03 2013 +0200
++++ b/Lib/test/regrtest.py	Tue Jul 16 03:33:39 2013 +0200
+@@ -676,8 +676,8 @@ def main(tests=None, testdir=None, verbo
+             while True:
+                 for test in tests:
+                     yield test
+-                    if bad:
+-                        return
++                    #if bad:
++                    #    return
+         tests = test_forever()
+         test_count = ''
+         test_count_width = 3
+diff -r 3a0be81db97c Lib/unittest/case.py
+--- a/Lib/unittest/case.py	Tue Jul 16 03:26:03 2013 +0200
++++ b/Lib/unittest/case.py	Tue Jul 16 03:33:39 2013 +0200
+@@ -8,6 +8,7 @@ import re
+ import warnings
+ import collections
+ import contextlib
++import failmalloc
+ 
+ from . import result
+ from .util import (strclass, safe_repr, _count_diff_all_purpose,
+@@ -493,7 +494,11 @@ class TestCase(object):
+             if outcome.success:
+                 outcome.expecting_failure = expecting_failure
+                 with outcome.testPartExecutor(self, isTest=True):
+-                    testMethod()
++                    failmalloc.enable()
++                    try:
++                        testMethod()
++                    finally:
++                        failmalloc.disable()
+                 outcome.expecting_failure = False
+                 with outcome.testPartExecutor(self):
+                     self.tearDown()
+diff -r 3a0be81db97c Modules/_sqlite/connection.c
+--- a/Modules/_sqlite/connection.c	Tue Jul 16 03:26:03 2013 +0200
++++ b/Modules/_sqlite/connection.c	Tue Jul 16 03:33:39 2013 +0200
+@@ -712,7 +712,13 @@ void _pysqlite_final_callback(sqlite3_co
+         goto error;
+     }
+ 
+-    function_result = _PyObject_CallMethodId(*aggregate_instance, &PyId_finalize, "");
++    if (!PyErr_Occurred()) {
++        function_result = _PyObject_CallMethodId(*aggregate_instance, &PyId_finalize, "");
++    }
++    else {
++        Py_INCREF(Py_None);
++        function_result = Py_None;
++    }
+     Py_DECREF(*aggregate_instance);
+ 
+     ok = 0;
+diff -r 3a0be81db97c Modules/pyexpat.c
+--- a/Modules/pyexpat.c	Tue Jul 16 03:26:03 2013 +0200
++++ b/Modules/pyexpat.c	Tue Jul 16 03:33:39 2013 +0200
+@@ -291,6 +291,8 @@ call_with_frame(PyCodeObject *c, PyObjec
+     if (c == NULL)
+         return NULL;
+ 
++    assert(!PyErr_Occurred());
++
+     f = PyFrame_New(tstate, c, PyEval_GetGlobals(), NULL);
+     if (f == NULL)
+         return NULL;
+@@ -358,9 +360,11 @@ call_character_handler(xmlparseobject *s
+     if (!have_handler(self, CharacterData))
+         return -1;
+ 
++    assert(!PyErr_Occurred());
+     args = PyTuple_New(1);
+     if (args == NULL)
+         return -1;
++    assert(!PyErr_Occurred());
+     temp = (conv_string_len_to_unicode(buffer, len));
+     if (temp == NULL) {
+         Py_DECREF(args);
+@@ -372,6 +376,7 @@ call_character_handler(xmlparseobject *s
+     PyTuple_SET_ITEM(args, 0, temp);
+     /* temp is now a borrowed reference; consider it unused. */
+     self->in_callback = 1;
++    assert(!PyErr_Occurred());
+     temp = call_with_frame(getcode(CharacterData, "CharacterData", __LINE__),
+                            self->handlers[CharacterData], args, self);
+     /* temp is an owned reference again, or NULL */
+@@ -391,10 +396,12 @@ static int
+ flush_character_buffer(xmlparseobject *self)
+ {
+     int rc;
++    assert(!PyErr_Occurred());
+     if (self->buffer == NULL || self->buffer_used == 0)
+         return 0;
+     rc = call_character_handler(self, self->buffer, self->buffer_used);
+     self->buffer_used = 0;
++    assert(rc >= 0 || !PyErr_Occurred());
+     return rc;
+ }
+ 
+@@ -402,6 +409,8 @@ static void
+ my_CharacterDataHandler(void *userData, const XML_Char *data, int len)
+ {
+     xmlparseobject *self = (xmlparseobject *) userData;
++    if (PyErr_Occurred())
++        return;
+     if (self->buffer == NULL)
+         call_character_handler(self, data, len);
+     else {
+@@ -436,6 +445,9 @@ my_StartElementHandler(void *userData,
+         PyObject *container, *rv, *args;
+         int i, max;
+ 
++        if (PyErr_Occurred())
++            return;
++
+         if (flush_character_buffer(self) < 0)
+             return;
+         /* Set max to the number of slots filled in atts[]; max/2 is
+@@ -519,6 +531,8 @@ my_##NAME##Handler PARAMS {\
+     INIT \
+ \
+     if (have_handler(self, NAME)) { \
++        if (PyErr_Occurred()) \
++            return RETURN; \
+         if (flush_character_buffer(self) < 0) \
+             return RETURN; \
+         args = Py_BuildValue PARAM_FORMAT ;\
+@@ -818,6 +832,7 @@ xmlparse_Parse(xmlparseobject *self, PyO
+         s += MAX_CHUNK_SIZE;
+         slen -= MAX_CHUNK_SIZE;
+     }
++    assert(!PyErr_Occurred());
+     rc = XML_Parse(self->itself, s, slen, isFinal);
+ 
+ done:
+@@ -1213,6 +1228,7 @@ newxmlparseobject(char *encoding, char *
+         return PyErr_NoMemory();
+     }
+     clear_handlers(self, 1);
++    assert(!PyErr_Occurred());
+ 
+     return (PyObject*)self;
+ }
+diff -r 3a0be81db97c Python/ceval.c
+--- a/Python/ceval.c	Tue Jul 16 03:26:03 2013 +0200
++++ b/Python/ceval.c	Tue Jul 16 03:33:39 2013 +0200
+@@ -1203,6 +1203,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+     if (throwflag) /* support for generator.throw() */
+         goto error;
+ 
++    assert(!PyErr_Occurred());
++
+     for (;;) {
+ #ifdef WITH_TSC
+         if (inst1 == 0) {
+@@ -1223,6 +1225,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+ #endif
+         assert(stack_pointer >= f->f_valuestack); /* else underflow */
+         assert(STACK_LEVEL() <= co->co_stacksize);  /* else overflow */
++        assert(!PyErr_Occurred());
+ 
+         /* Do periodic things.  Doing this every time through
+            the loop would add too much overhead, so we do it
+@@ -1329,6 +1332,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+         }
+ #endif
+ 
++        assert(!PyErr_Occurred());
++
+         /* Main switch on opcode */
+         READ_TIMESTAMP(inst0);
+ 
+@@ -1874,6 +1879,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+         }
+ 
+         TARGET(RETURN_VALUE) {
++            assert(!PyErr_Occurred());
+             retval = POP();
+             why = WHY_RETURN;
+             goto fast_block_end;
+@@ -3123,6 +3129,9 @@ fast_block_end:
+ 
+         if (why != WHY_NOT)
+             break;
++
++        assert(!PyErr_Occurred());
++
+         READ_TIMESTAMP(loop1);
+ 
+     } /* main loop */
+@@ -3137,6 +3146,9 @@ fast_block_end:
+     if (why != WHY_RETURN)
+         retval = NULL;
+ 
++    assert((retval != NULL && !PyErr_Occurred())
++            || (retval == NULL && PyErr_Occurred()));
++
+ fast_yield:
+     if (co->co_flags & CO_GENERATOR && (why == WHY_YIELD || why == WHY_RETURN)) {
+         /* The purpose of this block is to put aside the generator's exception
+@@ -3195,6 +3207,8 @@ exit_eval_frame:
+     Py_LeaveRecursiveCall();
+     tstate->frame = f->f_back;
+ 
++    assert((retval != NULL && !PyErr_Occurred())
++            || (retval == NULL && PyErr_Occurred()));
+     return retval;
+ }
+ 
+@@ -4044,6 +4058,8 @@ PyEval_CallObjectWithKeywords(PyObject *
+ {
+     PyObject *result;
+ 
++    assert(!PyErr_Occurred());
++
+     if (arg == NULL) {
+         arg = PyTuple_New(0);
+         if (arg == NULL)
+@@ -4064,8 +4080,12 @@ PyEval_CallObjectWithKeywords(PyObject *
+         return NULL;
+     }
+ 
++    assert(!PyErr_Occurred());
++
+     result = PyObject_Call(func, arg, kw);
+     Py_DECREF(arg);
++    assert((result != NULL && !PyErr_Occurred())
++           || (result == NULL && PyErr_Occurred()));
+     return result;
+ }
+ 
+@@ -4248,6 +4268,7 @@ fast_function(PyObject *func, PyObject *
+     PyObject *argdefs = PyFunction_GET_DEFAULTS(func);
+     PyObject *kwdefs = PyFunction_GET_KW_DEFAULTS(func);
+     PyObject **d = NULL;
++    PyObject *res;
+     int nd = 0;
+ 
+     PCALL(PCALL_FUNCTION);
+@@ -4279,20 +4300,26 @@ fast_function(PyObject *func, PyObject *
+             Py_INCREF(*stack);
+             fastlocals[i] = *stack++;
+         }
++        assert(!PyErr_Occurred());
+         retval = PyEval_EvalFrameEx(f,0);
+         ++tstate->recursion_depth;
+         Py_DECREF(f);
+         --tstate->recursion_depth;
++        assert((retval != NULL && !PyErr_Occurred())
++                || (retval == NULL && PyErr_Occurred()));
+         return retval;
+     }
+     if (argdefs != NULL) {
+         d = &PyTuple_GET_ITEM(argdefs, 0);
+         nd = Py_SIZE(argdefs);
+     }
+-    return PyEval_EvalCodeEx((PyObject*)co, globals,
++    res = PyEval_EvalCodeEx((PyObject*)co, globals,
+                              (PyObject *)NULL, (*pp_stack)-n, na,
+                              (*pp_stack)-2*nk, nk, d, nd, kwdefs,
+                              PyFunction_GET_CLOSURE(func));
++    assert((res != NULL && !PyErr_Occurred())
++           || (res == NULL && PyErr_Occurred()));
++    return res;
+ }
+ 
+ static PyObject *
+diff -r 3a0be81db97c Python/errors.c
+--- a/Python/errors.c	Tue Jul 16 03:26:03 2013 +0200
++++ b/Python/errors.c	Tue Jul 16 03:33:39 2013 +0200
+@@ -664,6 +664,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
+ void
+ _PyErr_BadInternalCall(const char *filename, int lineno)
+ {
++    assert(0 && "bad argument to internal function");
+     PyErr_Format(PyExc_SystemError,
+                  "%s:%d: bad argument to internal function",
+                  filename, lineno);
+@@ -695,6 +696,13 @@ PyErr_Format(PyObject *exception, const 
+     va_start(vargs);
+ #endif
+ 
++#ifndef NDEBUG
++    /* PyEval_EvalFrameEx() can be called indirectly by
++     * PyUnicode_FromFormatV(), whereas this function checks using assertion
++     * that no error was raised. */
++    PyErr_Clear();
++#endif
++
+     string = PyUnicode_FromFormatV(format, vargs);
+     PyErr_SetObject(exception, string);
+     Py_XDECREF(string);
