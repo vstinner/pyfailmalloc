@@ -1,6 +1,18 @@
-diff -r 8c1ca6720246 Lib/test/regrtest.py
---- a/Lib/test/regrtest.py	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Lib/test/regrtest.py	Wed Jul 17 00:58:41 2013 +0200
+diff -r 5bd9db528aed Include/frameobject.h
+--- a/Include/frameobject.h	Thu Jul 18 01:49:30 2013 +0200
++++ b/Include/frameobject.h	Thu Jul 18 02:08:47 2013 +0200
+@@ -75,6 +75,8 @@ PyAPI_FUNC(PyObject **) PyFrame_ExtendSt
+ /* Conversions between "fast locals" and locals in dictionary */
+ 
+ PyAPI_FUNC(void) PyFrame_LocalsToFast(PyFrameObject *, int);
++
++PyAPI_FUNC(int) PyFrame_FastToLocalsWithError(PyFrameObject *f);
+ PyAPI_FUNC(void) PyFrame_FastToLocals(PyFrameObject *);
+ 
+ PyAPI_FUNC(int) PyFrame_ClearFreeList(void);
+diff -r 5bd9db528aed Lib/test/regrtest.py
+--- a/Lib/test/regrtest.py	Thu Jul 18 01:49:30 2013 +0200
++++ b/Lib/test/regrtest.py	Thu Jul 18 02:08:47 2013 +0200
 @@ -676,8 +676,8 @@ def main(tests=None, testdir=None, verbo
              while True:
                  for test in tests:
@@ -12,9 +24,9 @@ diff -r 8c1ca6720246 Lib/test/regrtest.py
          tests = test_forever()
          test_count = ''
          test_count_width = 3
-diff -r 8c1ca6720246 Lib/test/test_set.py
---- a/Lib/test/test_set.py	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Lib/test/test_set.py	Wed Jul 17 00:58:41 2013 +0200
+diff -r 5bd9db528aed Lib/test/test_set.py
+--- a/Lib/test/test_set.py	Thu Jul 18 01:49:30 2013 +0200
++++ b/Lib/test/test_set.py	Thu Jul 18 02:08:47 2013 +0200
 @@ -626,9 +626,9 @@ class TestSet(TestJointOps, unittest.Tes
          self.assertTrue(myobj.le_called)
  
@@ -28,9 +40,9 @@ diff -r 8c1ca6720246 Lib/test/test_set.py
  
  class SetSubclass(set):
      pass
-diff -r 8c1ca6720246 Lib/threading.py
---- a/Lib/threading.py	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Lib/threading.py	Wed Jul 17 00:58:41 2013 +0200
+diff -r 5bd9db528aed Lib/threading.py
+--- a/Lib/threading.py	Thu Jul 18 01:49:30 2013 +0200
++++ b/Lib/threading.py	Thu Jul 18 02:08:47 2013 +0200
 @@ -2,6 +2,7 @@
  
  import sys as _sys
@@ -47,18 +59,19 @@ diff -r 8c1ca6720246 Lib/threading.py
          try:
              _start_new_thread(self._bootstrap, ())
          except Exception:
-diff -r 8c1ca6720246 Lib/unittest/case.py
---- a/Lib/unittest/case.py	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Lib/unittest/case.py	Wed Jul 17 00:58:41 2013 +0200
-@@ -8,6 +8,7 @@ import re
+diff -r 5bd9db528aed Lib/unittest/case.py
+--- a/Lib/unittest/case.py	Thu Jul 18 01:49:30 2013 +0200
++++ b/Lib/unittest/case.py	Thu Jul 18 02:08:47 2013 +0200
+@@ -8,6 +8,8 @@ import re
  import warnings
  import collections
  import contextlib
 +import failmalloc
++import gc
  
  from . import result
  from .util import (strclass, safe_repr, _count_diff_all_purpose,
-@@ -493,7 +494,11 @@ class TestCase(object):
+@@ -493,12 +495,18 @@ class TestCase(object):
              if outcome.success:
                  outcome.expecting_failure = expecting_failure
                  with outcome.testPartExecutor(self, isTest=True):
@@ -71,133 +84,37 @@ diff -r 8c1ca6720246 Lib/unittest/case.py
                  outcome.expecting_failure = False
                  with outcome.testPartExecutor(self):
                      self.tearDown()
-diff -r 8c1ca6720246 Modules/_sqlite/connection.c
---- a/Modules/_sqlite/connection.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Modules/_sqlite/connection.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -712,7 +712,13 @@ void _pysqlite_final_callback(sqlite3_co
-         goto error;
-     }
  
--    function_result = _PyObject_CallMethodId(*aggregate_instance, &PyId_finalize, "");
-+    if (!PyErr_Occurred()) {
-+        function_result = _PyObject_CallMethodId(*aggregate_instance, &PyId_finalize, "");
-+    }
-+    else {
-+        Py_INCREF(Py_None);
-+        function_result = Py_None;
-+    }
-     Py_DECREF(*aggregate_instance);
+             self.doCleanups()
++            gc.collect()
++            gc.collect()
+             for test, reason in outcome.skipped:
+                 self._addSkip(result, test, reason)
+             self._feedErrorsToResult(result, outcome.errors)
+@@ -517,6 +525,8 @@ class TestCase(object):
+                 stopTestRun = getattr(result, 'stopTestRun', None)
+                 if stopTestRun is not None:
+                     stopTestRun()
++            gc.collect()
++            gc.collect()
  
-     ok = 0;
-diff -r 8c1ca6720246 Modules/_sqlite/cursor.c
---- a/Modules/_sqlite/cursor.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Modules/_sqlite/cursor.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -339,6 +339,7 @@ PyObject* _pysqlite_fetch_one_row(pysqli
-                 if (self->connection->text_factory == (PyObject*)&PyUnicode_Type) {
-                     converted = PyUnicode_FromStringAndSize(val_str, nbytes);
-                     if (!converted) {
-+                        PyErr_Clear();
-                         colname = sqlite3_column_name(self->statement->st, i);
-                         if (!colname) {
-                             colname = "<unknown column name>";
-@@ -349,6 +350,7 @@ PyObject* _pysqlite_fetch_one_row(pysqli
-                         if (!buf_bytes) {
-                             PyErr_SetString(pysqlite_OperationalError, "Could not decode to UTF-8");
-                         } else {
-+                            assert(!PyErr_Occurred());
-                             error_obj = PyUnicode_FromEncodedObject(buf_bytes, "ascii", "replace");
-                             if (!error_obj) {
-                                 PyErr_SetString(pysqlite_OperationalError, "Could not decode to UTF-8");
-diff -r 8c1ca6720246 Modules/cjkcodecs/multibytecodec.c
---- a/Modules/cjkcodecs/multibytecodec.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Modules/cjkcodecs/multibytecodec.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -371,26 +371,32 @@ multibytecodec_decerror(MultibyteCodec *
-     if (e > 0) {
-         reason = "illegal multibyte sequence";
-         esize = e;
-+        assert(!PyErr_Occurred());
-     }
-     else {
-         switch (e) {
-         case MBERR_TOOSMALL:
-+            assert(!PyErr_Occurred());
-             return 0; /* retry it */
-         case MBERR_TOOFEW:
-             reason = "incomplete multibyte sequence";
-             esize = (Py_ssize_t)(buf->inbuf_end - buf->inbuf);
-             break;
-         case MBERR_INTERNAL:
-+            assert(!PyErr_Occurred());
-             PyErr_SetString(PyExc_RuntimeError,
-                             "internal codec error");
-             return -1;
-         case MBERR_EXCEPTION:
-+            assert(PyErr_Occurred());
-             return -1;
-         default:
-+            assert(!PyErr_Occurred());
-             PyErr_SetString(PyExc_RuntimeError,
-                             "unknown runtime error");
-             return -1;
-         }
-+        assert(!PyErr_Occurred());
-     }
- 
-     if (errors == ERROR_REPLACE) {
-@@ -407,6 +413,7 @@ multibytecodec_decerror(MultibyteCodec *
-     end = start + esize;
+     def doCleanups(self):
+         """Execute all cleanup functions. Normally called for you after
+diff -r 5bd9db528aed Modules/cjkcodecs/multibytecodec.c
+--- a/Modules/cjkcodecs/multibytecodec.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Modules/cjkcodecs/multibytecodec.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -408,6 +408,7 @@ multibytecodec_decerror(MultibyteCodec *
  
      /* use cached exception object if available */
-+    assert(!PyErr_Occurred());
      if (buf->excobj == NULL) {
++        assert(!PyErr_Occurred());
          buf->excobj = PyUnicodeDecodeError_Create(codec->encoding,
                          (const char *)buf->inbuf_top,
-diff -r 8c1ca6720246 Modules/pyexpat.c
---- a/Modules/pyexpat.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Modules/pyexpat.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -291,6 +291,8 @@ call_with_frame(PyCodeObject *c, PyObjec
-     if (c == NULL)
-         return NULL;
- 
-+    assert(!PyErr_Occurred());
-+
-     f = PyFrame_New(tstate, c, PyEval_GetGlobals(), NULL);
-     if (f == NULL)
-         return NULL;
-@@ -358,9 +360,11 @@ call_character_handler(xmlparseobject *s
-     if (!have_handler(self, CharacterData))
-         return -1;
- 
-+    assert(!PyErr_Occurred());
-     args = PyTuple_New(1);
-     if (args == NULL)
-         return -1;
-+    assert(!PyErr_Occurred());
-     temp = (conv_string_len_to_unicode(buffer, len));
-     if (temp == NULL) {
-         Py_DECREF(args);
-@@ -372,6 +376,7 @@ call_character_handler(xmlparseobject *s
-     PyTuple_SET_ITEM(args, 0, temp);
-     /* temp is now a borrowed reference; consider it unused. */
-     self->in_callback = 1;
-+    assert(!PyErr_Occurred());
-     temp = call_with_frame(getcode(CharacterData, "CharacterData", __LINE__),
-                            self->handlers[CharacterData], args, self);
-     /* temp is an owned reference again, or NULL */
-@@ -391,10 +396,12 @@ static int
- flush_character_buffer(xmlparseobject *self)
- {
-     int rc;
-+    assert(!PyErr_Occurred());
-     if (self->buffer == NULL || self->buffer_used == 0)
-         return 0;
-     rc = call_character_handler(self, self->buffer, self->buffer_used);
-     self->buffer_used = 0;
-+    assert(rc >= 0 || !PyErr_Occurred());
-     return rc;
- }
- 
-@@ -402,6 +409,8 @@ static void
+                         (Py_ssize_t)(buf->inbuf_end - buf->inbuf_top),
+diff -r 5bd9db528aed Modules/pyexpat.c
+--- a/Modules/pyexpat.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Modules/pyexpat.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -402,6 +402,8 @@ static void
  my_CharacterDataHandler(void *userData, const XML_Char *data, int len)
  {
      xmlparseobject *self = (xmlparseobject *) userData;
@@ -206,7 +123,7 @@ diff -r 8c1ca6720246 Modules/pyexpat.c
      if (self->buffer == NULL)
          call_character_handler(self, data, len);
      else {
-@@ -436,6 +445,9 @@ my_StartElementHandler(void *userData,
+@@ -436,6 +438,9 @@ my_StartElementHandler(void *userData,
          PyObject *container, *rv, *args;
          int i, max;
  
@@ -216,7 +133,7 @@ diff -r 8c1ca6720246 Modules/pyexpat.c
          if (flush_character_buffer(self) < 0)
              return;
          /* Set max to the number of slots filled in atts[]; max/2 is
-@@ -519,6 +531,8 @@ my_##NAME##Handler PARAMS {\
+@@ -519,6 +524,8 @@ my_##NAME##Handler PARAMS {\
      INIT \
  \
      if (have_handler(self, NAME)) { \
@@ -225,23 +142,7 @@ diff -r 8c1ca6720246 Modules/pyexpat.c
          if (flush_character_buffer(self) < 0) \
              return RETURN; \
          args = Py_BuildValue PARAM_FORMAT ;\
-@@ -818,6 +832,7 @@ xmlparse_Parse(xmlparseobject *self, PyO
-         s += MAX_CHUNK_SIZE;
-         slen -= MAX_CHUNK_SIZE;
-     }
-+    assert(!PyErr_Occurred());
-     rc = XML_Parse(self->itself, s, slen, isFinal);
- 
- done:
-@@ -1213,6 +1228,7 @@ newxmlparseobject(char *encoding, char *
-         return PyErr_NoMemory();
-     }
-     clear_handlers(self, 1);
-+    assert(!PyErr_Occurred());
- 
-     return (PyObject*)self;
- }
-@@ -1758,6 +1774,8 @@ MODULE_INITFUNC(void)
+@@ -1758,6 +1765,8 @@ MODULE_INITFUNC(void)
      PyModule_AddStringConstant(m, "native_encoding", "UTF-8");
  
      sys_modules = PySys_GetObject("modules");
@@ -250,21 +151,202 @@ diff -r 8c1ca6720246 Modules/pyexpat.c
      d = PyModule_GetDict(m);
      errors_module = PyDict_GetItem(d, errmod_name);
      if (errors_module == NULL) {
-diff -r 8c1ca6720246 Objects/typeobject.c
---- a/Objects/typeobject.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Objects/typeobject.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -736,7 +736,10 @@ type_call(PyTypeObject *type, PyObject *
-         return NULL;
-     }
- 
+diff -r 5bd9db528aed Objects/exceptions.c
+--- a/Objects/exceptions.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Objects/exceptions.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -1955,6 +1955,7 @@ PyUnicodeDecodeError_Create(
+     const char *encoding, const char *object, Py_ssize_t length,
+     Py_ssize_t start, Py_ssize_t end, const char *reason)
+ {
 +    assert(!PyErr_Occurred());
+     return PyObject_CallFunction(PyExc_UnicodeDecodeError, "sy#nns",
+                                  encoding, object, length, start, end, reason);
+ }
+diff -r 5bd9db528aed Objects/frameobject.c
+--- a/Objects/frameobject.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Objects/frameobject.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -21,7 +21,8 @@ static PyMemberDef frame_memberlist[] = 
+ static PyObject *
+ frame_getlocals(PyFrameObject *f, void *closure)
+ {
+-    PyFrame_FastToLocals(f);
++    if (PyFrame_FastToLocalsWithError(f) < 0)
++        return NULL;
+     Py_INCREF(f->f_locals);
+     return f->f_locals;
+ }
+@@ -748,12 +749,9 @@ PyFrame_BlockPop(PyFrameObject *f)
+    If deref is true, then the values being copied are cell variables
+    and the value is extracted from the cell variable before being put
+    in dict.
+-
+-   Exceptions raised while modifying the dict are silently ignored,
+-   because there is no good way to report them.
+  */
+ 
+-static void
++static int
+ map_to_dict(PyObject *map, Py_ssize_t nmap, PyObject *dict, PyObject **values,
+             int deref)
+ {
+@@ -771,13 +769,14 @@ map_to_dict(PyObject *map, Py_ssize_t nm
+         }
+         if (value == NULL) {
+             if (PyObject_DelItem(dict, key) != 0)
+-                PyErr_Clear();
++                return -1;
+         }
+         else {
+             if (PyObject_SetItem(dict, key, value) != 0)
+-                PyErr_Clear();
++                return -1;
+         }
+     }
++    return 0;
+ }
+ 
+ /* Copy values from the "locals" dict into the fast locals.
+@@ -834,42 +833,50 @@ dict_to_map(PyObject *map, Py_ssize_t nm
+     }
+ }
+ 
+-void
+-PyFrame_FastToLocals(PyFrameObject *f)
++int
++PyFrame_FastToLocalsWithError(PyFrameObject *f)
+ {
+     /* Merge fast locals into f->f_locals */
+     PyObject *locals, *map;
+     PyObject **fast;
+-    PyObject *error_type, *error_value, *error_traceback;
+     PyCodeObject *co;
+     Py_ssize_t j;
+     Py_ssize_t ncells, nfreevars;
+-    if (f == NULL)
+-        return;
++    int res;
++
++    if (f == NULL) {
++        PyErr_BadInternalCall();
++        return -1;
++    }
+     locals = f->f_locals;
+     if (locals == NULL) {
+         locals = f->f_locals = PyDict_New();
+-        if (locals == NULL) {
+-            PyErr_Clear(); /* Can't report it :-( */
+-            return;
+-        }
++        if (locals == NULL)
++            return -1;
+     }
+     co = f->f_code;
+     map = co->co_varnames;
+-    if (!PyTuple_Check(map))
+-        return;
+-    PyErr_Fetch(&error_type, &error_value, &error_traceback);
++    if (!PyTuple_Check(map)) {
++        PyErr_Format(PyExc_SystemError,
++                     "co_varnames must be a tuple, not %s",
++                     Py_TYPE(map)->tp_name);
++        return -1;
++    }
+     fast = f->f_localsplus;
+     j = PyTuple_GET_SIZE(map);
+     if (j > co->co_nlocals)
+         j = co->co_nlocals;
+-    if (co->co_nlocals)
+-        map_to_dict(map, j, locals, fast, 0);
++    if (co->co_nlocals) {
++        if (map_to_dict(map, j, locals, fast, 0) < 0)
++            return -1;
++    }
+     ncells = PyTuple_GET_SIZE(co->co_cellvars);
+     nfreevars = PyTuple_GET_SIZE(co->co_freevars);
+     if (ncells || nfreevars) {
+-        map_to_dict(co->co_cellvars, ncells,
+-                    locals, fast + co->co_nlocals, 1);
++        if (map_to_dict(co->co_cellvars, ncells,
++                        locals, fast + co->co_nlocals, 1))
++            return -1;
++
+         /* If the namespace is unoptimized, then one of the
+            following cases applies:
+            1. It does not contain free variables, because it
+@@ -879,11 +886,26 @@ PyFrame_FastToLocals(PyFrameObject *f)
+            into the locals dict used by the class.
+         */
+         if (co->co_flags & CO_OPTIMIZED) {
+-            map_to_dict(co->co_freevars, nfreevars,
+-                        locals, fast + co->co_nlocals + ncells, 1);
++            if (map_to_dict(co->co_freevars, nfreevars,
++                            locals, fast + co->co_nlocals + ncells, 1) < 0)
++                return -1;
+         }
+     }
++    return 0;
++}
++
++void
++PyFrame_FastToLocals(PyFrameObject *f)
++{
++    int res;
++    PyObject *error_type, *error_value, *error_traceback;
++
++    PyErr_Fetch(&error_type, &error_value, &error_traceback);
++    res = PyFrame_FastToLocalsWithError(f);
+     PyErr_Restore(error_type, error_value, error_traceback);
++
++    if (res < 0)
++        PyErr_Clear();
+ }
+ 
+ void
+diff -r 5bd9db528aed Objects/listobject.c
+--- a/Objects/listobject.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Objects/listobject.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -644,9 +644,14 @@ list_ass_slice(PyListObject *a, Py_ssize
+     memcpy(recycle, &item[ilow], s);
+ 
+     if (d < 0) { /* Delete -d items */
+-        memmove(&item[ihigh+d], &item[ihigh],
+-            (Py_SIZE(a) - ihigh)*sizeof(PyObject *));
+-        list_resize(a, Py_SIZE(a) + d);
++        Py_ssize_t tail;
++        tail = (Py_SIZE(a) - ihigh) * sizeof(PyObject *);
++        memmove(&item[ihigh+d], &item[ihigh], tail);
++        if (list_resize(a, Py_SIZE(a) + d) < 0) {
++            memmove(&item[ihigh], &item[ihigh+d], tail);
++            memcpy(&item[ilow], recycle, s);
++            goto Error;
++        }
+         item = a->ob_item;
+     }
+     else if (d > 0) { /* Insert d items */
+@@ -2528,7 +2533,9 @@ list_ass_subscript(PyListObject* self, P
+             }
+ 
+             Py_SIZE(self) -= slicelength;
+-            list_resize(self, Py_SIZE(self));
++            if (list_resize(self, Py_SIZE(self)) < 0) {
++                assert(0 && "oh oh FIXME: python -m test -F test_userlist");
++            }
+ 
+             for (i = 0; i < slicelength; i++) {
+                 Py_DECREF(garbage[i]);
+diff -r 5bd9db528aed Objects/typeobject.c
+--- a/Objects/typeobject.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Objects/typeobject.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -744,6 +744,8 @@ type_call(PyTypeObject *type, PyObject *
+ #endif
+ 
      obj = type->tp_new(type, args, kwds);
 +    assert((obj != NULL && !PyErr_Occurred())
 +           || (obj == NULL && PyErr_Occurred()));
      if (obj != NULL) {
          /* Ugly exception: when the call was type(something),
             don't call tp_init on the result. */
-@@ -752,6 +755,8 @@ type_call(PyTypeObject *type, PyObject *
+@@ -759,6 +761,8 @@ type_call(PyTypeObject *type, PyObject *
          type = Py_TYPE(obj);
          if (type->tp_init != NULL) {
              int res = type->tp_init(obj, args, kwds);
@@ -273,48 +355,37 @@ diff -r 8c1ca6720246 Objects/typeobject.c
              if (res < 0) {
                  Py_DECREF(obj);
                  obj = NULL;
-diff -r 8c1ca6720246 Python/ast.c
---- a/Python/ast.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Python/ast.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -115,7 +115,7 @@ validate_arguments(arguments_ty args)
-     }
-     if (!validate_args(args->kwonlyargs))
-         return 0;
--    if (args->kwarg && args->kwarg->annotation 
-+    if (args->kwarg && args->kwarg->annotation
-         && !validate_expr(args->kwarg->annotation, Load)) {
-             return 0;
-     }
-@@ -451,7 +451,7 @@ validate_exprs(asdl_seq *exprs, expr_con
-                             "None disallowed in expression list");
-             return 0;
+@@ -2279,6 +2283,7 @@ type_new(PyTypeObject *metatype, PyObjec
+             goto error;
          }
--            
-+
      }
-     return 1;
- }
-diff -r 8c1ca6720246 Python/ceval.c
---- a/Python/ceval.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Python/ceval.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -1203,6 +1203,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
-     if (throwflag) /* support for generator.throw() */
-         goto error;
- 
-+    assert(!PyErr_Occurred());
 +
-     for (;;) {
- #ifdef WITH_TSC
-         if (inst1 == 0) {
-@@ -1223,6 +1225,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
- #endif
-         assert(stack_pointer >= f->f_valuestack); /* else underflow */
-         assert(STACK_LEVEL() <= co->co_stacksize);  /* else overflow */
-+        assert(!PyErr_Occurred());
+     et->ht_qualname = qualname ? qualname : et->ht_name;
+     Py_INCREF(et->ht_qualname);
+     if (qualname != NULL && PyDict_DelItem(dict, PyId___qualname__.object) < 0)
+diff -r 5bd9db528aed Python/bltinmodule.c
+--- a/Python/bltinmodule.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Python/bltinmodule.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -771,8 +771,14 @@ builtin_eval(PyObject *self, PyObject *a
+     }
  
-         /* Do periodic things.  Doing this every time through
-            the loop would add too much overhead, so we do it
-@@ -1329,6 +1332,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+     if (PyDict_GetItemString(globals, "__builtins__") == NULL) {
++        PyObject *builtins = PyEval_GetBuiltins();
++        if (builtins == NULL) {
++            /* FIXME: raise an error? */
++            assert(PyErr_Occurred());
++            return NULL;
++        }
+         if (PyDict_SetItemString(globals, "__builtins__",
+-                                 PyEval_GetBuiltins()) != 0)
++                                 builtins) != 0)
+             return NULL;
+     }
+ 
+diff -r 5bd9db528aed Python/ceval.c
+--- a/Python/ceval.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Python/ceval.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -1337,6 +1337,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
          }
  #endif
  
@@ -323,95 +394,26 @@ diff -r 8c1ca6720246 Python/ceval.c
          /* Main switch on opcode */
          READ_TIMESTAMP(inst0);
  
-@@ -1874,6 +1879,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
-         }
- 
-         TARGET(RETURN_VALUE) {
-+            assert(!PyErr_Occurred());
-             retval = POP();
-             why = WHY_RETURN;
-             goto fast_block_end;
-@@ -3053,6 +3059,7 @@ fast_block_end:
-                 why = WHY_NOT;
-                 JUMPTO(PyLong_AS_LONG(retval));
-                 Py_DECREF(retval);
-+                assert(!PyErr_Occurred());
-                 break;
-             }
-             /* Now we have to pop the block. */
-@@ -3066,6 +3073,7 @@ fast_block_end:
-             if (b->b_type == SETUP_LOOP && why == WHY_BREAK) {
-                 why = WHY_NOT;
-                 JUMPTO(b->b_handler);
-+                assert(!PyErr_Occurred());
-                 break;
-             }
-             if (why == WHY_EXCEPTION && (b->b_type == SETUP_EXCEPT
-@@ -3084,29 +3092,35 @@ fast_block_end:
-                     PUSH(Py_None);
-                 }
-                 PyErr_Fetch(&exc, &val, &tb);
-+                assert(!PyErr_Occurred());
-                 /* Make the raw exception data
-                    available to the handler,
-                    so a program can emulate the
-                    Python main loop. */
-                 PyErr_NormalizeException(
-                     &exc, &val, &tb);
-+                assert(!PyErr_Occurred());
-                 if (tb != NULL)
-                     PyException_SetTraceback(val, tb);
-                 else
-                     PyException_SetTraceback(val, Py_None);
-+                assert(!PyErr_Occurred());
-                 Py_INCREF(exc);
-                 tstate->exc_type = exc;
-                 Py_INCREF(val);
-                 tstate->exc_value = val;
-                 tstate->exc_traceback = tb;
-+                assert(!PyErr_Occurred());
-                 if (tb == NULL)
-                     tb = Py_None;
-                 Py_INCREF(tb);
-                 PUSH(tb);
-                 PUSH(val);
-                 PUSH(exc);
-+                assert(!PyErr_Occurred());
-                 why = WHY_NOT;
-                 JUMPTO(handler);
-+                assert(!PyErr_Occurred());
-                 break;
-             }
-             if (b->b_type == SETUP_FINALLY) {
-@@ -3115,6 +3129,7 @@ fast_block_end:
-                 PUSH(PyLong_FromLong((long)why));
-                 why = WHY_NOT;
-                 JUMPTO(b->b_handler);
-+                assert(!PyErr_Occurred());
-                 break;
-             }
-         } /* unwind stack */
-@@ -3123,6 +3138,9 @@ fast_block_end:
+@@ -2472,7 +2474,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+         TARGET(IMPORT_STAR) {
+             PyObject *from = POP(), *locals;
+             int err;
+-            PyFrame_FastToLocals(f);
++            if (PyFrame_FastToLocalsWithError(f) < 0)
++                goto error;
++
+             locals = f->f_locals;
+             if (locals == NULL) {
+                 PyErr_SetString(PyExc_SystemError,
+@@ -3131,6 +3135,7 @@ fast_block_end:
  
          if (why != WHY_NOT)
              break;
 +
-+        assert(!PyErr_Occurred());
-+
          READ_TIMESTAMP(loop1);
  
-     } /* main loop */
-@@ -3137,6 +3155,9 @@ fast_block_end:
-     if (why != WHY_RETURN)
-         retval = NULL;
- 
-+    assert((retval != NULL && !PyErr_Occurred())
-+            || (retval == NULL && PyErr_Occurred()));
-+
- fast_yield:
-     if (co->co_flags & CO_GENERATOR && (why == WHY_YIELD || why == WHY_RETURN)) {
-         /* The purpose of this block is to put aside the generator's exception
-@@ -3195,6 +3216,8 @@ exit_eval_frame:
+         assert(!PyErr_Occurred());
+@@ -3208,6 +3213,8 @@ exit_eval_frame:
      Py_LeaveRecursiveCall();
      tstate->frame = f->f_back;
  
@@ -420,16 +422,26 @@ diff -r 8c1ca6720246 Python/ceval.c
      return retval;
  }
  
-@@ -4044,6 +4067,8 @@ PyEval_CallObjectWithKeywords(PyObject *
- {
-     PyObject *result;
+@@ -4004,7 +4011,8 @@ PyEval_GetLocals(void)
+     PyFrameObject *current_frame = PyEval_GetFrame();
+     if (current_frame == NULL)
+         return NULL;
+-    PyFrame_FastToLocals(current_frame);
++    if (PyFrame_FastToLocalsWithError(current_frame) < 0)
++        return NULL;
+     return current_frame->f_locals;
+ }
+ 
+@@ -4064,6 +4072,8 @@ PyEval_CallObjectWithKeywords(PyObject *
+     assert(!PyErr_Occurred());
+ #endif
  
 +    assert(!PyErr_Occurred());
 +
      if (arg == NULL) {
          arg = PyTuple_New(0);
          if (arg == NULL)
-@@ -4064,8 +4089,12 @@ PyEval_CallObjectWithKeywords(PyObject *
+@@ -4084,6 +4094,8 @@ PyEval_CallObjectWithKeywords(PyObject *
          return NULL;
      }
  
@@ -437,12 +449,8 @@ diff -r 8c1ca6720246 Python/ceval.c
 +
      result = PyObject_Call(func, arg, kw);
      Py_DECREF(arg);
-+    assert((result != NULL && !PyErr_Occurred())
-+           || (result == NULL && PyErr_Occurred()));
-     return result;
- }
  
-@@ -4169,15 +4198,21 @@ call_function(PyObject ***pp_stack, int 
+@@ -4192,15 +4204,21 @@ call_function(PyObject ***pp_stack, int 
              PyObject *self = PyCFunction_GET_SELF(func);
              if (flags & METH_NOARGS && na == 0) {
                  C_TRACE(x, (*meth)(self,NULL));
@@ -464,7 +472,7 @@ diff -r 8c1ca6720246 Python/ceval.c
              }
          }
          else {
-@@ -4188,9 +4223,13 @@ call_function(PyObject ***pp_stack, int 
+@@ -4211,9 +4229,13 @@ call_function(PyObject ***pp_stack, int 
                  C_TRACE(x, PyCFunction_Call(func,callargs,NULL));
                  READ_TIMESTAMP(*pintr1);
                  Py_XDECREF(callargs);
@@ -478,7 +486,7 @@ diff -r 8c1ca6720246 Python/ceval.c
              }
          }
      } else {
-@@ -4213,6 +4252,8 @@ call_function(PyObject ***pp_stack, int 
+@@ -4236,6 +4258,8 @@ call_function(PyObject ***pp_stack, int 
              x = fast_function(func, pp_stack, n, na, nk);
          else
              x = do_call(func, pp_stack, na, nk);
@@ -487,7 +495,7 @@ diff -r 8c1ca6720246 Python/ceval.c
          READ_TIMESTAMP(*pintr1);
          Py_DECREF(func);
      }
-@@ -4248,6 +4289,7 @@ fast_function(PyObject *func, PyObject *
+@@ -4274,6 +4298,7 @@ fast_function(PyObject *func, PyObject *
      PyObject *argdefs = PyFunction_GET_DEFAULTS(func);
      PyObject *kwdefs = PyFunction_GET_KW_DEFAULTS(func);
      PyObject **d = NULL;
@@ -495,7 +503,7 @@ diff -r 8c1ca6720246 Python/ceval.c
      int nd = 0;
  
      PCALL(PCALL_FUNCTION);
-@@ -4279,20 +4321,26 @@ fast_function(PyObject *func, PyObject *
+@@ -4305,20 +4330,26 @@ fast_function(PyObject *func, PyObject *
              Py_INCREF(*stack);
              fastlocals[i] = *stack++;
          }
@@ -523,9 +531,9 @@ diff -r 8c1ca6720246 Python/ceval.c
  }
  
  static PyObject *
-diff -r 8c1ca6720246 Python/compile.c
---- a/Python/compile.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Python/compile.c	Wed Jul 17 00:58:41 2013 +0200
+diff -r 5bd9db528aed Python/compile.c
+--- a/Python/compile.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Python/compile.c	Thu Jul 18 02:08:47 2013 +0200
 @@ -302,9 +302,11 @@ PyAST_CompileEx(mod_ty mod, const char *
              return NULL;
      }
@@ -538,94 +546,10 @@ diff -r 8c1ca6720246 Python/compile.c
      c.c_filename_obj = PyUnicode_DecodeFSDefault(filename);
      if (!c.c_filename_obj)
          goto finally;
-diff -r 8c1ca6720246 Python/errors.c
---- a/Python/errors.c	Wed Jul 17 00:57:58 2013 +0200
-+++ b/Python/errors.c	Wed Jul 17 00:58:41 2013 +0200
-@@ -71,6 +71,13 @@ PyErr_SetObject(PyObject *exception, PyO
-         if (value == NULL || !PyExceptionInstance_Check(value)) {
-             /* We must normalize the value right now */
-             PyObject *args, *fixed_value;
-+
-+#ifndef NDEBUG
-+            /* PyEval_EvalFrameEx() checks using assertion
-+             * that no error was raised. */
-+            PyErr_Clear();
-+#endif
-+
-             if (value == NULL || value == Py_None)
-                 args = PyTuple_New(0);
-             else if (PyTuple_Check(value)) {
-@@ -122,6 +129,9 @@ void
- PyErr_SetString(PyObject *exception, const char *string)
- {
-     PyObject *value = PyUnicode_FromString(string);
-+#if 0
-+    assert(exception != PyExc_SystemError);
-+#endif
-     PyErr_SetObject(exception, value);
-     Py_XDECREF(value);
- }
-@@ -207,6 +217,8 @@ PyErr_NormalizeException(PyObject **exc,
-     PyObject *initial_tb = NULL;
-     PyThreadState *tstate = NULL;
- 
-+    assert(!PyErr_Occurred());
-+
-     if (type == NULL) {
-         /* There was no exception, so nothing to do. */
-         return;
-@@ -223,6 +235,8 @@ PyErr_NormalizeException(PyObject **exc,
-     if (PyExceptionInstance_Check(value))
-         inclass = PyExceptionInstance_Class(value);
- 
-+                assert(!PyErr_Occurred());
-+
-     /* Normalize the exception so that if the type is a class, the
-        value will be an instance.
-     */
-@@ -259,8 +273,10 @@ PyErr_NormalizeException(PyObject **exc,
-             Py_DECREF(args);
-             if (res == NULL)
-                 goto finally;
-+            assert(!PyErr_Occurred());
-             Py_DECREF(value);
-             value = res;
-+            assert(!PyErr_Occurred());
-         }
-         /* if the class of the instance doesn't exactly match the
-            class of the type, believe the instance
-@@ -269,8 +285,11 @@ PyErr_NormalizeException(PyObject **exc,
-             Py_DECREF(type);
-             type = inclass;
-             Py_INCREF(type);
-+            assert(!PyErr_Occurred());
-         }
-+        assert(!PyErr_Occurred());
-     }
-+    assert(!PyErr_Occurred());
-     *exc = type;
-     *val = value;
-     return;
-@@ -283,6 +302,7 @@ finally:
-     */
-     initial_tb = *tb;
-     PyErr_Fetch(exc, val, tb);
-+    assert(!PyErr_Occurred());
-     if (initial_tb != NULL) {
-         if (*tb == NULL)
-             *tb = initial_tb;
-@@ -304,8 +324,10 @@ finally:
-         /* just keeping the old traceback */
-         return;
-     }
-+    assert(!PyErr_Occurred());
-     PyErr_NormalizeException(exc, val, tb);
-     --tstate->recursion_depth;
-+    assert(!PyErr_Occurred());
- }
- 
- 
-@@ -673,6 +695,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
+diff -r 5bd9db528aed Python/errors.c
+--- a/Python/errors.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Python/errors.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -681,6 +681,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
  void
  _PyErr_BadInternalCall(const char *filename, int lineno)
  {
@@ -633,17 +557,32 @@ diff -r 8c1ca6720246 Python/errors.c
      PyErr_Format(PyExc_SystemError,
                   "%s:%d: bad argument to internal function",
                   filename, lineno);
-@@ -704,6 +727,13 @@ PyErr_Format(PyObject *exception, const 
-     va_start(vargs);
- #endif
+diff -r 5bd9db528aed Python/sysmodule.c
+--- a/Python/sysmodule.c	Thu Jul 18 01:49:30 2013 +0200
++++ b/Python/sysmodule.c	Thu Jul 18 02:08:47 2013 +0200
+@@ -332,12 +332,16 @@ static PyObject *
+ call_trampoline(PyThreadState *tstate, PyObject* callback,
+                 PyFrameObject *frame, int what, PyObject *arg)
+ {
+-    PyObject *args = PyTuple_New(3);
++    PyObject *args;
+     PyObject *whatstr;
+     PyObject *result;
  
-+#ifndef NDEBUG
-+    /* PyEval_EvalFrameEx() can be called indirectly by
-+     * PyUnicode_FromFormatV(), whereas this function checks using assertion
-+     * that no error was raised. */
-+    PyErr_Clear();
-+#endif
++    args = PyTuple_New(3);
+     if (args == NULL)
+         return NULL;
++    if (PyFrame_FastToLocalsWithError(frame) < 0)
++        return NULL;
 +
-     string = PyUnicode_FromFormatV(format, vargs);
-     PyErr_SetObject(exception, string);
-     Py_XDECREF(string);
+     Py_INCREF(frame);
+     whatstr = whatstrings[what];
+     Py_INCREF(whatstr);
+@@ -349,7 +353,6 @@ call_trampoline(PyThreadState *tstate, P
+     PyTuple_SET_ITEM(args, 2, arg);
+ 
+     /* call the Python-level function */
+-    PyFrame_FastToLocals(frame);
+     result = PyEval_CallObject(callback, args);
+     PyFrame_LocalsToFast(frame, 1);
+     if (result == NULL)
