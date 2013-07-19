@@ -106,7 +106,7 @@ failmalloc_disable(PyObject *module)
 }
 
 PyDoc_STRVAR(module_doc,
-"faulthandler module.");
+"failmalloc module.");
 
 static PyMethodDef module_methods[] = {
     {"enable",
@@ -120,7 +120,7 @@ static PyMethodDef module_methods[] = {
 
 static struct PyModuleDef module_def = {
     PyModuleDef_HEAD_INIT,
-    "faulthandler",
+    "failmalloc",
     module_doc,
     0, /* non-negative size to be able to unload the module */
     module_methods,
