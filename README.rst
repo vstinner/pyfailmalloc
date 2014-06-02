@@ -28,6 +28,10 @@ The version can be read from failmalloc.__version__ as a string (ex:
 Changelog
 =========
 
+Version 0.2
+
+- Support Python 3.5: hook also calloc(), support the new PyMemAllocatorEx API
+
 Version 0.1 (2013-07-08)
 
 - First public version

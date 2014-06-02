@@ -1,11 +1,16 @@
 #include "Python.h"
 #include <stdlib.h>
 
-#define VERSION "0.1"
+#define VERSION "0.2"
 
 static int enabled = 0;
 static int installed = 0;
 static size_t next_error = 0;
+
+#if PY_VERSION_HEX >= 0x03050000
+#  define FAIL_CALLOC
+#  define PyMemAllocator PyMemAllocatorEx
+#endif
 
 struct {
     PyMemAllocator raw;
@@ -16,25 +21,33 @@ struct {
 static void* hook_malloc(void *ctx, size_t size)
 {
     PyMemAllocator *alloc = (PyMemAllocator *)ctx;
-    void *ptr;
     if (next_error != 0)
         next_error--;
     if (next_error == 1)
         return NULL;
-    ptr = alloc->malloc(alloc->ctx, size);
-    return ptr;
+    return alloc->malloc(alloc->ctx, size);
 }
+
+#ifdef FAIL_CALLOC
+static void* hook_calloc(void *ctx, size_t nelem, size_t elsize)
+{
+    PyMemAllocator *alloc = (PyMemAllocator *)ctx;
+    if (next_error != 0)
+        next_error--;
+    if (next_error == 1)
+        return NULL;
+    return alloc->calloc(alloc->ctx, nelem, elsize);
+}
+#endif
 
 static void* hook_realloc(void *ctx, void *ptr, size_t new_size)
 {
     PyMemAllocator *alloc = (PyMemAllocator *)ctx;
-    void *ptr2;
     if (next_error != 0)
         next_error--;
     if (next_error == 1)
         return NULL;
-    ptr2 = alloc->realloc(alloc->ctx, ptr, new_size);
-    return ptr2;
+    return alloc->realloc(alloc->ctx, ptr, new_size);
 }
 
 static void hook_free(void *ctx, void *ptr)
@@ -48,6 +61,9 @@ static void setup_hooks(void)
     PyMemAllocator alloc;
 
     alloc.malloc = hook_malloc;
+#ifdef FAIL_CALLOC
+    alloc.calloc = hook_calloc;
+#endif
     alloc.realloc = hook_realloc;
     alloc.free = hook_free;
     PyMem_GetAllocator(PYMEM_DOMAIN_RAW, &hook.raw);

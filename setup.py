@@ -17,7 +17,7 @@
 
 from distutils.core import setup, Extension
 
-VERSION = '0.1'
+VERSION = '0.2'
 
 CLASSIFIERS = [
     'Development Status :: 3 - Alpha',
