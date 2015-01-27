@@ -28,7 +28,7 @@ The version can be read from failmalloc.__version__ as a string (ex:
 Changelog
 =========
 
-Version 0.2
+Version 0.2 (2015-01-27)
 
 - Support Python 3.5: hook also calloc(), support the new PyMemAllocatorEx API
 - Add tox.ini to run tests using tox
