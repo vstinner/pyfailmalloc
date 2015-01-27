@@ -1,7 +1,6 @@
 include COPYING
-include MANIFEST.in
 include README.rst
-
 include Makefile
-
+include debug_cpython.gdb debug_cpython.patch
 include test_failmalloc.py
+include tox.ini
