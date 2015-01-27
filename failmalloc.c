@@ -1,7 +1,7 @@
 #include "Python.h"
 #include <stdlib.h>
 
-#define VERSION "0.2"
+#define VERSION "0.3"
 
 static int enabled = 0;
 static int installed = 0;

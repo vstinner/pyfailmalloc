@@ -24,7 +24,7 @@ except ImportError:
     # We won't be able to build the Wheel file on Windows.
     from distutils.core import setup, Extension
 
-VERSION = '0.2'
+VERSION = '0.3'
 
 CLASSIFIERS = [
     'Development Status :: 3 - Alpha',
