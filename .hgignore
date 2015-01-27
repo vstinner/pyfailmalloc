@@ -5,3 +5,4 @@ pyfailmalloc.egg-info
 build
 dist
 MANIFEST
+.tox

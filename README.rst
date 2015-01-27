@@ -31,6 +31,7 @@ Changelog
 Version 0.2
 
 - Support Python 3.5: hook also calloc(), support the new PyMemAllocatorEx API
+- Add tox.ini to run tests using tox
 
 Version 0.1 (2013-07-08)
 

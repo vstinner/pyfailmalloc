@@ -2,7 +2,7 @@
 
 # Todo list to prepare a release:
 #  - update VERSION in failmalloc.c and setup.py
-#  - run unit tests
+#  - run unit tests: run tox
 #  - set release date in the README.rst file
 #  - hg ci
 #  - hg tag VERSION
