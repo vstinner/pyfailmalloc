@@ -15,7 +15,14 @@
 #  - hg commit
 #  - hg push
 
-from distutils.core import setup, Extension
+try:
+    from setuptools import setup, Extension
+    SETUPTOOLS = True
+except ImportError:
+    SETUPTOOLS = False
+    # Use distutils.core as a fallback.
+    # We won't be able to build the Wheel file on Windows.
+    from distutils.core import setup, Extension
 
 VERSION = '0.2'
 

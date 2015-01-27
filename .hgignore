@@ -1,6 +1,7 @@
 syntax: glob
 *.swp
 *.pyc
+pyfailmalloc.egg-info
 build
 dist
 MANIFEST
