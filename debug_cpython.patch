@@ -1,19 +1,7 @@
-diff -r 5bd9db528aed Include/frameobject.h
---- a/Include/frameobject.h	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Include/frameobject.h	Thu Jul 18 02:08:47 2013 +0200
-@@ -75,6 +75,8 @@ PyAPI_FUNC(PyObject **) PyFrame_ExtendSt
- /* Conversions between "fast locals" and locals in dictionary */
- 
- PyAPI_FUNC(void) PyFrame_LocalsToFast(PyFrameObject *, int);
-+
-+PyAPI_FUNC(int) PyFrame_FastToLocalsWithError(PyFrameObject *f);
- PyAPI_FUNC(void) PyFrame_FastToLocals(PyFrameObject *);
- 
- PyAPI_FUNC(int) PyFrame_ClearFreeList(void);
-diff -r 5bd9db528aed Lib/test/regrtest.py
---- a/Lib/test/regrtest.py	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Lib/test/regrtest.py	Thu Jul 18 02:08:47 2013 +0200
-@@ -676,8 +676,8 @@ def main(tests=None, testdir=None, verbo
+diff -r 57550e1f57d9 Lib/test/regrtest.py
+--- a/Lib/test/regrtest.py	Tue Mar 24 14:01:32 2015 +0100
++++ b/Lib/test/regrtest.py	Tue Mar 24 16:19:08 2015 +0100
+@@ -663,8 +663,8 @@ def main(tests=None, **kwargs):
              while True:
                  for test in tests:
                      yield test
@@ -24,34 +12,36 @@ diff -r 5bd9db528aed Lib/test/regrtest.py
          tests = test_forever()
          test_count = ''
          test_count_width = 3
-diff -r 5bd9db528aed Lib/test/test_set.py
---- a/Lib/test/test_set.py	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Lib/test/test_set.py	Thu Jul 18 02:08:47 2013 +0200
-@@ -626,9 +626,9 @@ class TestSet(TestJointOps, unittest.Tes
+diff -r 57550e1f57d9 Lib/test/test_set.py
+--- a/Lib/test/test_set.py	Tue Mar 24 14:01:32 2015 +0100
++++ b/Lib/test/test_set.py	Tue Mar 24 16:19:08 2015 +0100
+@@ -626,10 +626,10 @@ class TestSet(TestJointOps, unittest.Tes
+         myset >= myobj
          self.assertTrue(myobj.le_called)
  
-     # C API test only available in a debug build
--    if hasattr(set, "test_c_api"):
--        def test_c_api(self):
--            self.assertEqual(set().test_c_api(), True)
-+    #if hasattr(set, "test_c_api"):
-+    #    def test_c_api(self):
-+    #        self.assertEqual(set().test_c_api(), True)
+-    @unittest.skipUnless(hasattr(set, "test_c_api"),
+-                         'C API test only available in a debug build')
+-    def test_c_api(self):
+-        self.assertEqual(set().test_c_api(), True)
++    #@unittest.skipUnless(hasattr(set, "test_c_api"),
++    #                     'C API test only available in a debug build')
++    #def test_c_api(self):
++    #    self.assertEqual(set().test_c_api(), True)
  
  class SetSubclass(set):
      pass
-diff -r 5bd9db528aed Lib/threading.py
---- a/Lib/threading.py	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Lib/threading.py	Thu Jul 18 02:08:47 2013 +0200
+diff -r 57550e1f57d9 Lib/threading.py
+--- a/Lib/threading.py	Tue Mar 24 14:01:32 2015 +0100
++++ b/Lib/threading.py	Tue Mar 24 16:19:08 2015 +0100
 @@ -2,6 +2,7 @@
  
  import sys as _sys
  import _thread
 +import failmalloc
  
- from time import sleep as _sleep
- try:
-@@ -585,6 +586,7 @@ class Thread:
+ from time import monotonic as _time
+ from traceback import format_exc as _format_exc
+@@ -849,6 +850,7 @@ class Thread:
              raise RuntimeError("threads can only be started once")
          with _active_limbo_lock:
              _limbo[self] = self
@@ -59,19 +49,19 @@ diff -r 5bd9db528aed Lib/threading.py
          try:
              _start_new_thread(self._bootstrap, ())
          except Exception:
-diff -r 5bd9db528aed Lib/unittest/case.py
---- a/Lib/unittest/case.py	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Lib/unittest/case.py	Thu Jul 18 02:08:47 2013 +0200
-@@ -8,6 +8,8 @@ import re
- import warnings
+diff -r 57550e1f57d9 Lib/unittest/case.py
+--- a/Lib/unittest/case.py	Tue Mar 24 14:01:32 2015 +0100
++++ b/Lib/unittest/case.py	Tue Mar 24 16:19:08 2015 +0100
+@@ -10,6 +10,8 @@ import warnings
  import collections
  import contextlib
+ import traceback
 +import failmalloc
 +import gc
  
  from . import result
  from .util import (strclass, safe_repr, _count_diff_all_purpose,
-@@ -493,12 +495,18 @@ class TestCase(object):
+@@ -574,12 +576,18 @@ class TestCase(object):
              if outcome.success:
                  outcome.expecting_failure = expecting_failure
                  with outcome.testPartExecutor(self, isTest=True):
@@ -91,19 +81,19 @@ diff -r 5bd9db528aed Lib/unittest/case.py
              for test, reason in outcome.skipped:
                  self._addSkip(result, test, reason)
              self._feedErrorsToResult(result, outcome.errors)
-@@ -517,6 +525,8 @@ class TestCase(object):
+@@ -598,6 +606,8 @@ class TestCase(object):
                  stopTestRun = getattr(result, 'stopTestRun', None)
                  if stopTestRun is not None:
                      stopTestRun()
 +            gc.collect()
 +            gc.collect()
  
-     def doCleanups(self):
-         """Execute all cleanup functions. Normally called for you after
-diff -r 5bd9db528aed Modules/cjkcodecs/multibytecodec.c
---- a/Modules/cjkcodecs/multibytecodec.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Modules/cjkcodecs/multibytecodec.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -408,6 +408,7 @@ multibytecodec_decerror(MultibyteCodec *
+             # explicitly break reference cycles:
+             # outcome.errors -> frame -> outcome -> outcome.errors
+diff -r 57550e1f57d9 Modules/cjkcodecs/multibytecodec.c
+--- a/Modules/cjkcodecs/multibytecodec.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Modules/cjkcodecs/multibytecodec.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -405,6 +405,7 @@ multibytecodec_decerror(MultibyteCodec *
  
      /* use cached exception object if available */
      if (buf->excobj == NULL) {
@@ -111,21 +101,12 @@ diff -r 5bd9db528aed Modules/cjkcodecs/multibytecodec.c
          buf->excobj = PyUnicodeDecodeError_Create(codec->encoding,
                          (const char *)buf->inbuf_top,
                          (Py_ssize_t)(buf->inbuf_end - buf->inbuf_top),
-diff -r 5bd9db528aed Modules/pyexpat.c
---- a/Modules/pyexpat.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Modules/pyexpat.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -402,6 +402,8 @@ static void
- my_CharacterDataHandler(void *userData, const XML_Char *data, int len)
- {
-     xmlparseobject *self = (xmlparseobject *) userData;
-+    if (PyErr_Occurred())
-+        return;
-     if (self->buffer == NULL)
-         call_character_handler(self, data, len);
-     else {
-@@ -436,6 +438,9 @@ my_StartElementHandler(void *userData,
-         PyObject *container, *rv, *args;
-         int i, max;
+diff -r 57550e1f57d9 Modules/pyexpat.c
+--- a/Modules/pyexpat.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Modules/pyexpat.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -348,6 +348,9 @@ my_StartElementHandler(void *userData,
+         if (PyErr_Occurred())
+             return;
  
 +        if (PyErr_Occurred())
 +            return;
@@ -133,16 +114,7 @@ diff -r 5bd9db528aed Modules/pyexpat.c
          if (flush_character_buffer(self) < 0)
              return;
          /* Set max to the number of slots filled in atts[]; max/2 is
-@@ -519,6 +524,8 @@ my_##NAME##Handler PARAMS {\
-     INIT \
- \
-     if (have_handler(self, NAME)) { \
-+        if (PyErr_Occurred()) \
-+            return RETURN; \
-         if (flush_character_buffer(self) < 0) \
-             return RETURN; \
-         args = Py_BuildValue PARAM_FORMAT ;\
-@@ -1758,6 +1765,8 @@ MODULE_INITFUNC(void)
+@@ -1971,6 +1974,8 @@ MODULE_INITFUNC(void)
      PyModule_AddStringConstant(m, "native_encoding", "UTF-8");
  
      sys_modules = PySys_GetObject("modules");
@@ -151,10 +123,10 @@ diff -r 5bd9db528aed Modules/pyexpat.c
      d = PyModule_GetDict(m);
      errors_module = PyDict_GetItem(d, errmod_name);
      if (errors_module == NULL) {
-diff -r 5bd9db528aed Objects/exceptions.c
---- a/Objects/exceptions.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Objects/exceptions.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -1955,6 +1955,7 @@ PyUnicodeDecodeError_Create(
+diff -r 57550e1f57d9 Objects/exceptions.c
+--- a/Objects/exceptions.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Objects/exceptions.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -2029,6 +2029,7 @@ PyUnicodeDecodeError_Create(
      const char *encoding, const char *object, Py_ssize_t length,
      Py_ssize_t start, Py_ssize_t end, const char *reason)
  {
@@ -162,182 +134,10 @@ diff -r 5bd9db528aed Objects/exceptions.c
      return PyObject_CallFunction(PyExc_UnicodeDecodeError, "sy#nns",
                                   encoding, object, length, start, end, reason);
  }
-diff -r 5bd9db528aed Objects/frameobject.c
---- a/Objects/frameobject.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Objects/frameobject.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -21,7 +21,8 @@ static PyMemberDef frame_memberlist[] = 
- static PyObject *
- frame_getlocals(PyFrameObject *f, void *closure)
- {
--    PyFrame_FastToLocals(f);
-+    if (PyFrame_FastToLocalsWithError(f) < 0)
-+        return NULL;
-     Py_INCREF(f->f_locals);
-     return f->f_locals;
- }
-@@ -748,12 +749,9 @@ PyFrame_BlockPop(PyFrameObject *f)
-    If deref is true, then the values being copied are cell variables
-    and the value is extracted from the cell variable before being put
-    in dict.
--
--   Exceptions raised while modifying the dict are silently ignored,
--   because there is no good way to report them.
-  */
- 
--static void
-+static int
- map_to_dict(PyObject *map, Py_ssize_t nmap, PyObject *dict, PyObject **values,
-             int deref)
- {
-@@ -771,13 +769,14 @@ map_to_dict(PyObject *map, Py_ssize_t nm
-         }
-         if (value == NULL) {
-             if (PyObject_DelItem(dict, key) != 0)
--                PyErr_Clear();
-+                return -1;
-         }
-         else {
-             if (PyObject_SetItem(dict, key, value) != 0)
--                PyErr_Clear();
-+                return -1;
-         }
-     }
-+    return 0;
- }
- 
- /* Copy values from the "locals" dict into the fast locals.
-@@ -834,42 +833,50 @@ dict_to_map(PyObject *map, Py_ssize_t nm
-     }
- }
- 
--void
--PyFrame_FastToLocals(PyFrameObject *f)
-+int
-+PyFrame_FastToLocalsWithError(PyFrameObject *f)
- {
-     /* Merge fast locals into f->f_locals */
-     PyObject *locals, *map;
-     PyObject **fast;
--    PyObject *error_type, *error_value, *error_traceback;
-     PyCodeObject *co;
-     Py_ssize_t j;
-     Py_ssize_t ncells, nfreevars;
--    if (f == NULL)
--        return;
-+    int res;
-+
-+    if (f == NULL) {
-+        PyErr_BadInternalCall();
-+        return -1;
-+    }
-     locals = f->f_locals;
-     if (locals == NULL) {
-         locals = f->f_locals = PyDict_New();
--        if (locals == NULL) {
--            PyErr_Clear(); /* Can't report it :-( */
--            return;
--        }
-+        if (locals == NULL)
-+            return -1;
-     }
-     co = f->f_code;
-     map = co->co_varnames;
--    if (!PyTuple_Check(map))
--        return;
--    PyErr_Fetch(&error_type, &error_value, &error_traceback);
-+    if (!PyTuple_Check(map)) {
-+        PyErr_Format(PyExc_SystemError,
-+                     "co_varnames must be a tuple, not %s",
-+                     Py_TYPE(map)->tp_name);
-+        return -1;
-+    }
-     fast = f->f_localsplus;
-     j = PyTuple_GET_SIZE(map);
-     if (j > co->co_nlocals)
-         j = co->co_nlocals;
--    if (co->co_nlocals)
--        map_to_dict(map, j, locals, fast, 0);
-+    if (co->co_nlocals) {
-+        if (map_to_dict(map, j, locals, fast, 0) < 0)
-+            return -1;
-+    }
-     ncells = PyTuple_GET_SIZE(co->co_cellvars);
-     nfreevars = PyTuple_GET_SIZE(co->co_freevars);
-     if (ncells || nfreevars) {
--        map_to_dict(co->co_cellvars, ncells,
--                    locals, fast + co->co_nlocals, 1);
-+        if (map_to_dict(co->co_cellvars, ncells,
-+                        locals, fast + co->co_nlocals, 1))
-+            return -1;
-+
-         /* If the namespace is unoptimized, then one of the
-            following cases applies:
-            1. It does not contain free variables, because it
-@@ -879,11 +886,26 @@ PyFrame_FastToLocals(PyFrameObject *f)
-            into the locals dict used by the class.
-         */
-         if (co->co_flags & CO_OPTIMIZED) {
--            map_to_dict(co->co_freevars, nfreevars,
--                        locals, fast + co->co_nlocals + ncells, 1);
-+            if (map_to_dict(co->co_freevars, nfreevars,
-+                            locals, fast + co->co_nlocals + ncells, 1) < 0)
-+                return -1;
-         }
-     }
-+    return 0;
-+}
-+
-+void
-+PyFrame_FastToLocals(PyFrameObject *f)
-+{
-+    int res;
-+    PyObject *error_type, *error_value, *error_traceback;
-+
-+    PyErr_Fetch(&error_type, &error_value, &error_traceback);
-+    res = PyFrame_FastToLocalsWithError(f);
-     PyErr_Restore(error_type, error_value, error_traceback);
-+
-+    if (res < 0)
-+        PyErr_Clear();
- }
- 
- void
-diff -r 5bd9db528aed Objects/listobject.c
---- a/Objects/listobject.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Objects/listobject.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -644,9 +644,14 @@ list_ass_slice(PyListObject *a, Py_ssize
-     memcpy(recycle, &item[ilow], s);
- 
-     if (d < 0) { /* Delete -d items */
--        memmove(&item[ihigh+d], &item[ihigh],
--            (Py_SIZE(a) - ihigh)*sizeof(PyObject *));
--        list_resize(a, Py_SIZE(a) + d);
-+        Py_ssize_t tail;
-+        tail = (Py_SIZE(a) - ihigh) * sizeof(PyObject *);
-+        memmove(&item[ihigh+d], &item[ihigh], tail);
-+        if (list_resize(a, Py_SIZE(a) + d) < 0) {
-+            memmove(&item[ihigh], &item[ihigh+d], tail);
-+            memcpy(&item[ilow], recycle, s);
-+            goto Error;
-+        }
-         item = a->ob_item;
-     }
-     else if (d > 0) { /* Insert d items */
-@@ -2528,7 +2533,9 @@ list_ass_subscript(PyListObject* self, P
-             }
- 
-             Py_SIZE(self) -= slicelength;
--            list_resize(self, Py_SIZE(self));
-+            if (list_resize(self, Py_SIZE(self)) < 0) {
-+                assert(0 && "oh oh FIXME: python -m test -F test_userlist");
-+            }
- 
-             for (i = 0; i < slicelength; i++) {
-                 Py_DECREF(garbage[i]);
-diff -r 5bd9db528aed Objects/typeobject.c
---- a/Objects/typeobject.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Objects/typeobject.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -744,6 +744,8 @@ type_call(PyTypeObject *type, PyObject *
+diff -r 57550e1f57d9 Objects/typeobject.c
+--- a/Objects/typeobject.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Objects/typeobject.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -906,6 +906,8 @@ type_call(PyTypeObject *type, PyObject *
  #endif
  
      obj = type->tp_new(type, args, kwds);
@@ -346,7 +146,7 @@ diff -r 5bd9db528aed Objects/typeobject.c
      if (obj != NULL) {
          /* Ugly exception: when the call was type(something),
             don't call tp_init on the result. */
-@@ -759,6 +761,8 @@ type_call(PyTypeObject *type, PyObject *
+@@ -921,6 +923,8 @@ type_call(PyTypeObject *type, PyObject *
          type = Py_TYPE(obj);
          if (type->tp_init != NULL) {
              int res = type->tp_init(obj, args, kwds);
@@ -355,7 +155,7 @@ diff -r 5bd9db528aed Objects/typeobject.c
              if (res < 0) {
                  Py_DECREF(obj);
                  obj = NULL;
-@@ -2279,6 +2283,7 @@ type_new(PyTypeObject *metatype, PyObjec
+@@ -2549,6 +2553,7 @@ type_new(PyTypeObject *metatype, PyObjec
              goto error;
          }
      }
@@ -363,29 +163,45 @@ diff -r 5bd9db528aed Objects/typeobject.c
      et->ht_qualname = qualname ? qualname : et->ht_name;
      Py_INCREF(et->ht_qualname);
      if (qualname != NULL && PyDict_DelItem(dict, PyId___qualname__.object) < 0)
-diff -r 5bd9db528aed Python/bltinmodule.c
---- a/Python/bltinmodule.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Python/bltinmodule.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -771,8 +771,14 @@ builtin_eval(PyObject *self, PyObject *a
+diff -r 57550e1f57d9 Python/bltinmodule.c
+--- a/Python/bltinmodule.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Python/bltinmodule.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -1079,8 +1079,14 @@ builtin_eval_impl(PyModuleDef *module, P
      }
  
-     if (PyDict_GetItemString(globals, "__builtins__") == NULL) {
+     if (_PyDict_GetItemId(globals, &PyId___builtins__) == NULL) {
 +        PyObject *builtins = PyEval_GetBuiltins();
 +        if (builtins == NULL) {
 +            /* FIXME: raise an error? */
 +            assert(PyErr_Occurred());
 +            return NULL;
 +        }
-         if (PyDict_SetItemString(globals, "__builtins__",
--                                 PyEval_GetBuiltins()) != 0)
-+                                 builtins) != 0)
+         if (_PyDict_SetItemId(globals, &PyId___builtins__,
+-                              PyEval_GetBuiltins()) != 0)
++                              builtins) != 0)
              return NULL;
      }
  
-diff -r 5bd9db528aed Python/ceval.c
---- a/Python/ceval.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Python/ceval.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -1337,6 +1337,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+@@ -1195,8 +1201,14 @@ builtin_exec_impl(PyModuleDef *module, P
+         return NULL;
+     }
+     if (_PyDict_GetItemId(globals, &PyId___builtins__) == NULL) {
++        PyObject *builtins = PyEval_GetBuiltins();
++        if (builtins == NULL) {
++            /* FIXME: raise an error? */
++            assert(PyErr_Occurred());
++            return NULL;
++        }
+         if (_PyDict_SetItemId(globals, &PyId___builtins__,
+-                              PyEval_GetBuiltins()) != 0)
++                              builtins) != 0)
+             return NULL;
+     }
+ 
+diff -r 57550e1f57d9 Python/ceval.c
+--- a/Python/ceval.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Python/ceval.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -1349,6 +1349,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
          }
  #endif
  
@@ -394,18 +210,7 @@ diff -r 5bd9db528aed Python/ceval.c
          /* Main switch on opcode */
          READ_TIMESTAMP(inst0);
  
-@@ -2472,7 +2474,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
-         TARGET(IMPORT_STAR) {
-             PyObject *from = POP(), *locals;
-             int err;
--            PyFrame_FastToLocals(f);
-+            if (PyFrame_FastToLocalsWithError(f) < 0)
-+                goto error;
-+
-             locals = f->f_locals;
-             if (locals == NULL) {
-                 PyErr_SetString(PyExc_SystemError,
-@@ -3131,6 +3135,7 @@ fast_block_end:
+@@ -3176,6 +3178,7 @@ fast_block_end:
  
          if (why != WHY_NOT)
              break;
@@ -413,26 +218,7 @@ diff -r 5bd9db528aed Python/ceval.c
          READ_TIMESTAMP(loop1);
  
          assert(!PyErr_Occurred());
-@@ -3208,6 +3213,8 @@ exit_eval_frame:
-     Py_LeaveRecursiveCall();
-     tstate->frame = f->f_back;
- 
-+    assert((retval != NULL && !PyErr_Occurred())
-+            || (retval == NULL && PyErr_Occurred()));
-     return retval;
- }
- 
-@@ -4004,7 +4011,8 @@ PyEval_GetLocals(void)
-     PyFrameObject *current_frame = PyEval_GetFrame();
-     if (current_frame == NULL)
-         return NULL;
--    PyFrame_FastToLocals(current_frame);
-+    if (PyFrame_FastToLocalsWithError(current_frame) < 0)
-+        return NULL;
-     return current_frame->f_locals;
- }
- 
-@@ -4064,6 +4072,8 @@ PyEval_CallObjectWithKeywords(PyObject *
+@@ -4125,6 +4128,8 @@ PyEval_CallObjectWithKeywords(PyObject *
      assert(!PyErr_Occurred());
  #endif
  
@@ -441,7 +227,7 @@ diff -r 5bd9db528aed Python/ceval.c
      if (arg == NULL) {
          arg = PyTuple_New(0);
          if (arg == NULL)
-@@ -4084,6 +4094,8 @@ PyEval_CallObjectWithKeywords(PyObject *
+@@ -4145,6 +4150,8 @@ PyEval_CallObjectWithKeywords(PyObject *
          return NULL;
      }
  
@@ -450,29 +236,7 @@ diff -r 5bd9db528aed Python/ceval.c
      result = PyObject_Call(func, arg, kw);
      Py_DECREF(arg);
  
-@@ -4192,15 +4204,21 @@ call_function(PyObject ***pp_stack, int 
-             PyObject *self = PyCFunction_GET_SELF(func);
-             if (flags & METH_NOARGS && na == 0) {
-                 C_TRACE(x, (*meth)(self,NULL));
-+                assert((x != NULL && !PyErr_Occurred())
-+                        || (x == NULL && PyErr_Occurred()));
-             }
-             else if (flags & METH_O && na == 1) {
-                 PyObject *arg = EXT_POP(*pp_stack);
-                 C_TRACE(x, (*meth)(self,arg));
-                 Py_DECREF(arg);
-+                assert((x != NULL && !PyErr_Occurred())
-+                        || (x == NULL && PyErr_Occurred()));
-             }
-             else {
-                 err_args(func, flags, na);
-                 x = NULL;
-+                assert((x != NULL && !PyErr_Occurred())
-+                        || (x == NULL && PyErr_Occurred()));
-             }
-         }
-         else {
-@@ -4211,9 +4229,13 @@ call_function(PyObject ***pp_stack, int 
+@@ -4273,9 +4280,13 @@ call_function(PyObject ***pp_stack, int 
                  C_TRACE(x, PyCFunction_Call(func,callargs,NULL));
                  READ_TIMESTAMP(*pintr1);
                  Py_XDECREF(callargs);
@@ -485,8 +249,8 @@ diff -r 5bd9db528aed Python/ceval.c
 +                        || (x == NULL && PyErr_Occurred()));
              }
          }
-     } else {
-@@ -4236,6 +4258,8 @@ call_function(PyObject ***pp_stack, int 
+     }
+@@ -4299,6 +4310,8 @@ call_function(PyObject ***pp_stack, int 
              x = fast_function(func, pp_stack, n, na, nk);
          else
              x = do_call(func, pp_stack, na, nk);
@@ -494,62 +258,25 @@ diff -r 5bd9db528aed Python/ceval.c
 +                || (x == NULL && PyErr_Occurred()));
          READ_TIMESTAMP(*pintr1);
          Py_DECREF(func);
-     }
-@@ -4274,6 +4298,7 @@ fast_function(PyObject *func, PyObject *
-     PyObject *argdefs = PyFunction_GET_DEFAULTS(func);
-     PyObject *kwdefs = PyFunction_GET_KW_DEFAULTS(func);
-     PyObject **d = NULL;
-+    PyObject *res;
-     int nd = 0;
  
-     PCALL(PCALL_FUNCTION);
-@@ -4305,20 +4330,26 @@ fast_function(PyObject *func, PyObject *
-             Py_INCREF(*stack);
-             fastlocals[i] = *stack++;
-         }
-+        assert(!PyErr_Occurred());
-         retval = PyEval_EvalFrameEx(f,0);
-         ++tstate->recursion_depth;
-         Py_DECREF(f);
-         --tstate->recursion_depth;
-+        assert((retval != NULL && !PyErr_Occurred())
-+                || (retval == NULL && PyErr_Occurred()));
-         return retval;
-     }
-     if (argdefs != NULL) {
-         d = &PyTuple_GET_ITEM(argdefs, 0);
-         nd = Py_SIZE(argdefs);
-     }
--    return PyEval_EvalCodeEx((PyObject*)co, globals,
-+    res = PyEval_EvalCodeEx((PyObject*)co, globals,
-                              (PyObject *)NULL, (*pp_stack)-n, na,
-                              (*pp_stack)-2*nk, nk, d, nd, kwdefs,
-                              PyFunction_GET_CLOSURE(func));
-+    assert((res != NULL && !PyErr_Occurred())
-+           || (res == NULL && PyErr_Occurred()));
-+    return res;
- }
- 
- static PyObject *
-diff -r 5bd9db528aed Python/compile.c
---- a/Python/compile.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Python/compile.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -302,9 +302,11 @@ PyAST_CompileEx(mod_ty mod, const char *
+diff -r 57550e1f57d9 Python/compile.c
+--- a/Python/compile.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Python/compile.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -301,8 +301,10 @@ PyAST_CompileObject(mod_ty mod, PyObject
              return NULL;
      }
  
 +    assert(!PyErr_Occurred());
      if (!compiler_init(&c))
          return NULL;
-     c.c_filename = filename;
 +    assert(!PyErr_Occurred());
-     c.c_filename_obj = PyUnicode_DecodeFSDefault(filename);
-     if (!c.c_filename_obj)
-         goto finally;
-diff -r 5bd9db528aed Python/errors.c
---- a/Python/errors.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Python/errors.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -681,6 +681,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
+     Py_INCREF(filename);
+     c.c_filename = filename;
+     c.c_arena = arena;
+diff -r 57550e1f57d9 Python/errors.c
+--- a/Python/errors.c	Tue Mar 24 14:01:32 2015 +0100
++++ b/Python/errors.c	Tue Mar 24 16:19:08 2015 +0100
+@@ -755,6 +755,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
  void
  _PyErr_BadInternalCall(const char *filename, int lineno)
  {
@@ -557,32 +284,3 @@ diff -r 5bd9db528aed Python/errors.c
      PyErr_Format(PyExc_SystemError,
                   "%s:%d: bad argument to internal function",
                   filename, lineno);
-diff -r 5bd9db528aed Python/sysmodule.c
---- a/Python/sysmodule.c	Thu Jul 18 01:49:30 2013 +0200
-+++ b/Python/sysmodule.c	Thu Jul 18 02:08:47 2013 +0200
-@@ -332,12 +332,16 @@ static PyObject *
- call_trampoline(PyThreadState *tstate, PyObject* callback,
-                 PyFrameObject *frame, int what, PyObject *arg)
- {
--    PyObject *args = PyTuple_New(3);
-+    PyObject *args;
-     PyObject *whatstr;
-     PyObject *result;
- 
-+    args = PyTuple_New(3);
-     if (args == NULL)
-         return NULL;
-+    if (PyFrame_FastToLocalsWithError(frame) < 0)
-+        return NULL;
-+
-     Py_INCREF(frame);
-     whatstr = whatstrings[what];
-     Py_INCREF(whatstr);
-@@ -349,7 +353,6 @@ call_trampoline(PyThreadState *tstate, P
-     PyTuple_SET_ITEM(args, 2, arg);
- 
-     /* call the Python-level function */
--    PyFrame_FastToLocals(frame);
-     result = PyEval_CallObject(callback, args);
-     PyFrame_LocalsToFast(frame, 1);
-     if (result == NULL)
