@@ -1,6 +1,6 @@
-diff -r 57550e1f57d9 Lib/test/regrtest.py
---- a/Lib/test/regrtest.py	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Lib/test/regrtest.py	Tue Mar 24 16:19:08 2015 +0100
+diff -r 40c659ec4d18 Lib/test/regrtest.py
+--- a/Lib/test/regrtest.py	Thu Sep 03 12:16:49 2015 +0200
++++ b/Lib/test/regrtest.py	Thu Sep 03 12:25:12 2015 +0200
 @@ -663,8 +663,8 @@ def main(tests=None, **kwargs):
              while True:
                  for test in tests:
@@ -12,10 +12,10 @@ diff -r 57550e1f57d9 Lib/test/regrtest.py
          tests = test_forever()
          test_count = ''
          test_count_width = 3
-diff -r 57550e1f57d9 Lib/test/test_set.py
---- a/Lib/test/test_set.py	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Lib/test/test_set.py	Tue Mar 24 16:19:08 2015 +0100
-@@ -626,10 +626,10 @@ class TestSet(TestJointOps, unittest.Tes
+diff -r 40c659ec4d18 Lib/test/test_set.py
+--- a/Lib/test/test_set.py	Thu Sep 03 12:16:49 2015 +0200
++++ b/Lib/test/test_set.py	Thu Sep 03 12:25:12 2015 +0200
+@@ -628,10 +628,10 @@ class TestSet(TestJointOps, unittest.Tes
          myset >= myobj
          self.assertTrue(myobj.le_called)
  
@@ -30,9 +30,9 @@ diff -r 57550e1f57d9 Lib/test/test_set.py
  
  class SetSubclass(set):
      pass
-diff -r 57550e1f57d9 Lib/threading.py
---- a/Lib/threading.py	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Lib/threading.py	Tue Mar 24 16:19:08 2015 +0100
+diff -r 40c659ec4d18 Lib/threading.py
+--- a/Lib/threading.py	Thu Sep 03 12:16:49 2015 +0200
++++ b/Lib/threading.py	Thu Sep 03 12:25:12 2015 +0200
 @@ -2,6 +2,7 @@
  
  import sys as _sys
@@ -49,9 +49,9 @@ diff -r 57550e1f57d9 Lib/threading.py
          try:
              _start_new_thread(self._bootstrap, ())
          except Exception:
-diff -r 57550e1f57d9 Lib/unittest/case.py
---- a/Lib/unittest/case.py	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Lib/unittest/case.py	Tue Mar 24 16:19:08 2015 +0100
+diff -r 40c659ec4d18 Lib/unittest/case.py
+--- a/Lib/unittest/case.py	Thu Sep 03 12:16:49 2015 +0200
++++ b/Lib/unittest/case.py	Thu Sep 03 12:25:12 2015 +0200
 @@ -10,6 +10,8 @@ import warnings
  import collections
  import contextlib
@@ -61,7 +61,7 @@ diff -r 57550e1f57d9 Lib/unittest/case.py
  
  from . import result
  from .util import (strclass, safe_repr, _count_diff_all_purpose,
-@@ -574,12 +576,18 @@ class TestCase(object):
+@@ -597,12 +599,18 @@ class TestCase(object):
              if outcome.success:
                  outcome.expecting_failure = expecting_failure
                  with outcome.testPartExecutor(self, isTest=True):
@@ -81,7 +81,7 @@ diff -r 57550e1f57d9 Lib/unittest/case.py
              for test, reason in outcome.skipped:
                  self._addSkip(result, test, reason)
              self._feedErrorsToResult(result, outcome.errors)
-@@ -598,6 +606,8 @@ class TestCase(object):
+@@ -621,6 +629,8 @@ class TestCase(object):
                  stopTestRun = getattr(result, 'stopTestRun', None)
                  if stopTestRun is not None:
                      stopTestRun()
@@ -90,10 +90,23 @@ diff -r 57550e1f57d9 Lib/unittest/case.py
  
              # explicitly break reference cycles:
              # outcome.errors -> frame -> outcome -> outcome.errors
-diff -r 57550e1f57d9 Modules/cjkcodecs/multibytecodec.c
---- a/Modules/cjkcodecs/multibytecodec.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Modules/cjkcodecs/multibytecodec.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -405,6 +405,7 @@ multibytecodec_decerror(MultibyteCodec *
+diff -r 40c659ec4d18 Modules/_testcapimodule.c
+--- a/Modules/_testcapimodule.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Modules/_testcapimodule.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -4120,6 +4120,9 @@ PyInit__testcapi(void)
+     PyModule_AddIntConstant(m, "the_number_three", 3);
+ 
+     TestError = PyErr_NewException("_testcapi.error", NULL, NULL);
++    if (TestError == NULL)
++        return NULL;
++
+     Py_INCREF(TestError);
+     PyModule_AddObject(m, "error", TestError);
+     return m;
+diff -r 40c659ec4d18 Modules/cjkcodecs/multibytecodec.c
+--- a/Modules/cjkcodecs/multibytecodec.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Modules/cjkcodecs/multibytecodec.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -400,6 +400,7 @@ multibytecodec_decerror(MultibyteCodec *
  
      /* use cached exception object if available */
      if (buf->excobj == NULL) {
@@ -101,10 +114,10 @@ diff -r 57550e1f57d9 Modules/cjkcodecs/multibytecodec.c
          buf->excobj = PyUnicodeDecodeError_Create(codec->encoding,
                          (const char *)buf->inbuf_top,
                          (Py_ssize_t)(buf->inbuf_end - buf->inbuf_top),
-diff -r 57550e1f57d9 Modules/pyexpat.c
---- a/Modules/pyexpat.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Modules/pyexpat.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -348,6 +348,9 @@ my_StartElementHandler(void *userData,
+diff -r 40c659ec4d18 Modules/pyexpat.c
+--- a/Modules/pyexpat.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Modules/pyexpat.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -350,6 +350,9 @@ my_StartElementHandler(void *userData,
          if (PyErr_Occurred())
              return;
  
@@ -114,7 +127,7 @@ diff -r 57550e1f57d9 Modules/pyexpat.c
          if (flush_character_buffer(self) < 0)
              return;
          /* Set max to the number of slots filled in atts[]; max/2 is
-@@ -1971,6 +1974,8 @@ MODULE_INITFUNC(void)
+@@ -1700,6 +1703,8 @@ MODULE_INITFUNC(void)
      PyModule_AddStringConstant(m, "native_encoding", "UTF-8");
  
      sys_modules = PySys_GetObject("modules");
@@ -123,10 +136,10 @@ diff -r 57550e1f57d9 Modules/pyexpat.c
      d = PyModule_GetDict(m);
      errors_module = PyDict_GetItem(d, errmod_name);
      if (errors_module == NULL) {
-diff -r 57550e1f57d9 Objects/exceptions.c
---- a/Objects/exceptions.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Objects/exceptions.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -2029,6 +2029,7 @@ PyUnicodeDecodeError_Create(
+diff -r 40c659ec4d18 Objects/exceptions.c
+--- a/Objects/exceptions.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Objects/exceptions.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -2041,6 +2041,7 @@ PyUnicodeDecodeError_Create(
      const char *encoding, const char *object, Py_ssize_t length,
      Py_ssize_t start, Py_ssize_t end, const char *reason)
  {
@@ -134,39 +147,10 @@ diff -r 57550e1f57d9 Objects/exceptions.c
      return PyObject_CallFunction(PyExc_UnicodeDecodeError, "sy#nns",
                                   encoding, object, length, start, end, reason);
  }
-diff -r 57550e1f57d9 Objects/typeobject.c
---- a/Objects/typeobject.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Objects/typeobject.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -906,6 +906,8 @@ type_call(PyTypeObject *type, PyObject *
- #endif
- 
-     obj = type->tp_new(type, args, kwds);
-+    assert((obj != NULL && !PyErr_Occurred())
-+           || (obj == NULL && PyErr_Occurred()));
-     if (obj != NULL) {
-         /* Ugly exception: when the call was type(something),
-            don't call tp_init on the result. */
-@@ -921,6 +923,8 @@ type_call(PyTypeObject *type, PyObject *
-         type = Py_TYPE(obj);
-         if (type->tp_init != NULL) {
-             int res = type->tp_init(obj, args, kwds);
-+            assert((res >= 0 && !PyErr_Occurred())
-+                    || (res < 0 && PyErr_Occurred()));
-             if (res < 0) {
-                 Py_DECREF(obj);
-                 obj = NULL;
-@@ -2549,6 +2553,7 @@ type_new(PyTypeObject *metatype, PyObjec
-             goto error;
-         }
-     }
-+
-     et->ht_qualname = qualname ? qualname : et->ht_name;
-     Py_INCREF(et->ht_qualname);
-     if (qualname != NULL && PyDict_DelItem(dict, PyId___qualname__.object) < 0)
-diff -r 57550e1f57d9 Python/bltinmodule.c
---- a/Python/bltinmodule.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Python/bltinmodule.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -1079,8 +1079,14 @@ builtin_eval_impl(PyModuleDef *module, P
+diff -r 40c659ec4d18 Python/bltinmodule.c
+--- a/Python/bltinmodule.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Python/bltinmodule.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -846,8 +846,14 @@ builtin_eval_impl(PyModuleDef *module, P
      }
  
      if (_PyDict_GetItemId(globals, &PyId___builtins__) == NULL) {
@@ -182,7 +166,7 @@ diff -r 57550e1f57d9 Python/bltinmodule.c
              return NULL;
      }
  
-@@ -1195,8 +1201,14 @@ builtin_exec_impl(PyModuleDef *module, P
+@@ -927,8 +933,14 @@ builtin_exec_impl(PyModuleDef *module, P
          return NULL;
      }
      if (_PyDict_GetItemId(globals, &PyId___builtins__) == NULL) {
@@ -198,10 +182,10 @@ diff -r 57550e1f57d9 Python/bltinmodule.c
              return NULL;
      }
  
-diff -r 57550e1f57d9 Python/ceval.c
---- a/Python/ceval.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Python/ceval.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -1349,6 +1349,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
+diff -r 40c659ec4d18 Python/ceval.c
+--- a/Python/ceval.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Python/ceval.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -1351,6 +1351,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
          }
  #endif
  
@@ -210,59 +194,10 @@ diff -r 57550e1f57d9 Python/ceval.c
          /* Main switch on opcode */
          READ_TIMESTAMP(inst0);
  
-@@ -3176,6 +3178,7 @@ fast_block_end:
- 
-         if (why != WHY_NOT)
-             break;
-+
-         READ_TIMESTAMP(loop1);
- 
-         assert(!PyErr_Occurred());
-@@ -4125,6 +4128,8 @@ PyEval_CallObjectWithKeywords(PyObject *
-     assert(!PyErr_Occurred());
- #endif
- 
-+    assert(!PyErr_Occurred());
-+
-     if (arg == NULL) {
-         arg = PyTuple_New(0);
-         if (arg == NULL)
-@@ -4145,6 +4150,8 @@ PyEval_CallObjectWithKeywords(PyObject *
-         return NULL;
-     }
- 
-+    assert(!PyErr_Occurred());
-+
-     result = PyObject_Call(func, arg, kw);
-     Py_DECREF(arg);
- 
-@@ -4273,9 +4280,13 @@ call_function(PyObject ***pp_stack, int 
-                 C_TRACE(x, PyCFunction_Call(func,callargs,NULL));
-                 READ_TIMESTAMP(*pintr1);
-                 Py_XDECREF(callargs);
-+                assert((x != NULL && !PyErr_Occurred())
-+                        || (x == NULL && PyErr_Occurred()));
-             }
-             else {
-                 x = NULL;
-+                assert((x != NULL && !PyErr_Occurred())
-+                        || (x == NULL && PyErr_Occurred()));
-             }
-         }
-     }
-@@ -4299,6 +4310,8 @@ call_function(PyObject ***pp_stack, int 
-             x = fast_function(func, pp_stack, n, na, nk);
-         else
-             x = do_call(func, pp_stack, na, nk);
-+        assert((x != NULL && !PyErr_Occurred())
-+                || (x == NULL && PyErr_Occurred()));
-         READ_TIMESTAMP(*pintr1);
-         Py_DECREF(func);
- 
-diff -r 57550e1f57d9 Python/compile.c
---- a/Python/compile.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Python/compile.c	Tue Mar 24 16:19:08 2015 +0100
-@@ -301,8 +301,10 @@ PyAST_CompileObject(mod_ty mod, PyObject
+diff -r 40c659ec4d18 Python/compile.c
+--- a/Python/compile.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Python/compile.c	Thu Sep 03 12:25:12 2015 +0200
+@@ -302,8 +302,10 @@ PyAST_CompileObject(mod_ty mod, PyObject
              return NULL;
      }
  
@@ -273,9 +208,9 @@ diff -r 57550e1f57d9 Python/compile.c
      Py_INCREF(filename);
      c.c_filename = filename;
      c.c_arena = arena;
-diff -r 57550e1f57d9 Python/errors.c
---- a/Python/errors.c	Tue Mar 24 14:01:32 2015 +0100
-+++ b/Python/errors.c	Tue Mar 24 16:19:08 2015 +0100
+diff -r 40c659ec4d18 Python/errors.c
+--- a/Python/errors.c	Thu Sep 03 12:16:49 2015 +0200
++++ b/Python/errors.c	Thu Sep 03 12:25:12 2015 +0200
 @@ -755,6 +755,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
  void
  _PyErr_BadInternalCall(const char *filename, int lineno)
