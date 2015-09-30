@@ -1,20 +1,20 @@
-diff -r 40c659ec4d18 Lib/test/regrtest.py
---- a/Lib/test/regrtest.py	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Lib/test/regrtest.py	Thu Sep 03 12:25:12 2015 +0200
-@@ -663,8 +663,8 @@ def main(tests=None, **kwargs):
-             while True:
-                 for test in tests:
-                     yield test
--                    if bad:
--                        return
-+                    #if bad:
-+                    #    return
-         tests = test_forever()
-         test_count = ''
-         test_count_width = 3
-diff -r 40c659ec4d18 Lib/test/test_set.py
---- a/Lib/test/test_set.py	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Lib/test/test_set.py	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Lib/test/libregrtest/main.py
+--- a/Lib/test/libregrtest/main.py	Wed Sep 30 13:51:17 2015 +0200
++++ b/Lib/test/libregrtest/main.py	Wed Sep 30 14:30:22 2015 +0200
+@@ -314,8 +314,8 @@ class Regrtest:
+         while True:
+             for test in tests:
+                 yield test
+-                if self.bad:
+-                    return
++                #if self.bad:
++                #    return
+ 
+     def run_tests(self):
+         if self.ns.forever:
+diff -r ec02ccffd1dc Lib/test/test_set.py
+--- a/Lib/test/test_set.py	Wed Sep 30 13:51:17 2015 +0200
++++ b/Lib/test/test_set.py	Wed Sep 30 14:30:22 2015 +0200
 @@ -628,10 +628,10 @@ class TestSet(TestJointOps, unittest.Tes
          myset >= myobj
          self.assertTrue(myobj.le_called)
@@ -30,9 +30,9 @@ diff -r 40c659ec4d18 Lib/test/test_set.py
  
  class SetSubclass(set):
      pass
-diff -r 40c659ec4d18 Lib/threading.py
---- a/Lib/threading.py	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Lib/threading.py	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Lib/threading.py
+--- a/Lib/threading.py	Wed Sep 30 13:51:17 2015 +0200
++++ b/Lib/threading.py	Wed Sep 30 14:30:22 2015 +0200
 @@ -2,6 +2,7 @@
  
  import sys as _sys
@@ -49,9 +49,9 @@ diff -r 40c659ec4d18 Lib/threading.py
          try:
              _start_new_thread(self._bootstrap, ())
          except Exception:
-diff -r 40c659ec4d18 Lib/unittest/case.py
---- a/Lib/unittest/case.py	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Lib/unittest/case.py	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Lib/unittest/case.py
+--- a/Lib/unittest/case.py	Wed Sep 30 13:51:17 2015 +0200
++++ b/Lib/unittest/case.py	Wed Sep 30 14:30:22 2015 +0200
 @@ -10,6 +10,8 @@ import warnings
  import collections
  import contextlib
@@ -90,10 +90,10 @@ diff -r 40c659ec4d18 Lib/unittest/case.py
  
              # explicitly break reference cycles:
              # outcome.errors -> frame -> outcome -> outcome.errors
-diff -r 40c659ec4d18 Modules/_testcapimodule.c
---- a/Modules/_testcapimodule.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Modules/_testcapimodule.c	Thu Sep 03 12:25:12 2015 +0200
-@@ -4120,6 +4120,9 @@ PyInit__testcapi(void)
+diff -r ec02ccffd1dc Modules/_testcapimodule.c
+--- a/Modules/_testcapimodule.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Modules/_testcapimodule.c	Wed Sep 30 14:30:22 2015 +0200
+@@ -4121,6 +4121,9 @@ PyInit__testcapi(void)
      PyModule_AddIntConstant(m, "the_number_three", 3);
  
      TestError = PyErr_NewException("_testcapi.error", NULL, NULL);
@@ -103,9 +103,9 @@ diff -r 40c659ec4d18 Modules/_testcapimodule.c
      Py_INCREF(TestError);
      PyModule_AddObject(m, "error", TestError);
      return m;
-diff -r 40c659ec4d18 Modules/cjkcodecs/multibytecodec.c
---- a/Modules/cjkcodecs/multibytecodec.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Modules/cjkcodecs/multibytecodec.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Modules/cjkcodecs/multibytecodec.c
+--- a/Modules/cjkcodecs/multibytecodec.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Modules/cjkcodecs/multibytecodec.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -400,6 +400,7 @@ multibytecodec_decerror(MultibyteCodec *
  
      /* use cached exception object if available */
@@ -114,9 +114,9 @@ diff -r 40c659ec4d18 Modules/cjkcodecs/multibytecodec.c
          buf->excobj = PyUnicodeDecodeError_Create(codec->encoding,
                          (const char *)buf->inbuf_top,
                          (Py_ssize_t)(buf->inbuf_end - buf->inbuf_top),
-diff -r 40c659ec4d18 Modules/pyexpat.c
---- a/Modules/pyexpat.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Modules/pyexpat.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Modules/pyexpat.c
+--- a/Modules/pyexpat.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Modules/pyexpat.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -350,6 +350,9 @@ my_StartElementHandler(void *userData,
          if (PyErr_Occurred())
              return;
@@ -127,7 +127,7 @@ diff -r 40c659ec4d18 Modules/pyexpat.c
          if (flush_character_buffer(self) < 0)
              return;
          /* Set max to the number of slots filled in atts[]; max/2 is
-@@ -1700,6 +1703,8 @@ MODULE_INITFUNC(void)
+@@ -1706,6 +1709,8 @@ MODULE_INITFUNC(void)
      PyModule_AddStringConstant(m, "native_encoding", "UTF-8");
  
      sys_modules = PySys_GetObject("modules");
@@ -136,9 +136,9 @@ diff -r 40c659ec4d18 Modules/pyexpat.c
      d = PyModule_GetDict(m);
      errors_module = PyDict_GetItem(d, errmod_name);
      if (errors_module == NULL) {
-diff -r 40c659ec4d18 Objects/exceptions.c
---- a/Objects/exceptions.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Objects/exceptions.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Objects/exceptions.c
+--- a/Objects/exceptions.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Objects/exceptions.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -2041,6 +2041,7 @@ PyUnicodeDecodeError_Create(
      const char *encoding, const char *object, Py_ssize_t length,
      Py_ssize_t start, Py_ssize_t end, const char *reason)
@@ -147,9 +147,9 @@ diff -r 40c659ec4d18 Objects/exceptions.c
      return PyObject_CallFunction(PyExc_UnicodeDecodeError, "sy#nns",
                                   encoding, object, length, start, end, reason);
  }
-diff -r 40c659ec4d18 Python/bltinmodule.c
---- a/Python/bltinmodule.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Python/bltinmodule.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Python/bltinmodule.c
+--- a/Python/bltinmodule.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Python/bltinmodule.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -846,8 +846,14 @@ builtin_eval_impl(PyModuleDef *module, P
      }
  
@@ -182,9 +182,9 @@ diff -r 40c659ec4d18 Python/bltinmodule.c
              return NULL;
      }
  
-diff -r 40c659ec4d18 Python/ceval.c
---- a/Python/ceval.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Python/ceval.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Python/ceval.c
+--- a/Python/ceval.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Python/ceval.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -1351,6 +1351,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int
          }
  #endif
@@ -194,9 +194,9 @@ diff -r 40c659ec4d18 Python/ceval.c
          /* Main switch on opcode */
          READ_TIMESTAMP(inst0);
  
-diff -r 40c659ec4d18 Python/compile.c
---- a/Python/compile.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Python/compile.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Python/compile.c
+--- a/Python/compile.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Python/compile.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -302,8 +302,10 @@ PyAST_CompileObject(mod_ty mod, PyObject
              return NULL;
      }
@@ -208,9 +208,9 @@ diff -r 40c659ec4d18 Python/compile.c
      Py_INCREF(filename);
      c.c_filename = filename;
      c.c_arena = arena;
-diff -r 40c659ec4d18 Python/errors.c
---- a/Python/errors.c	Thu Sep 03 12:16:49 2015 +0200
-+++ b/Python/errors.c	Thu Sep 03 12:25:12 2015 +0200
+diff -r ec02ccffd1dc Python/errors.c
+--- a/Python/errors.c	Wed Sep 30 13:51:17 2015 +0200
++++ b/Python/errors.c	Wed Sep 30 14:30:22 2015 +0200
 @@ -755,6 +755,7 @@ PyErr_SetImportError(PyObject *msg, PyOb
  void
  _PyErr_BadInternalCall(const char *filename, int lineno)
