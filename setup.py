@@ -4,16 +4,19 @@
 #  - update VERSION in failmalloc.c and setup.py
 #  - run unit tests: run tox
 #  - set release date in the README.rst file
-#  - hg ci
-#  - hg tag VERSION
-#  - hg push
+#  - git commit -a -m "prepare release x.y"
+#  - git push
+#
+# Release a new version:
+#
+#  - git tag VERSION
+#  - git push --tags
 #  - python setup.py register sdist upload
 #
 # After the release:
 #  - set version to n+1
-#  - add a new empty section in the changelog for version n+1
-#  - hg commit
-#  - hg push
+#  - git commit -a -m "post-release"
+#  - git push
 
 try:
     from setuptools import setup, Extension
@@ -51,7 +54,7 @@ def main():
         'license': 'MIT license',
         'description': 'inject memory allocation faults',
         'long_description': long_description,
-        'url': 'https://bitbucket.org/haypo/pyfailmalloc',
+        'url': 'https://bitbucket.org/vstinner/pyfailmalloc',
         'author': 'Victor Stinner',
         'author_email': 'victor.stinner@gmail.com',
         'ext_modules': [ext],

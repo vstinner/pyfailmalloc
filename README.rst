@@ -12,7 +12,7 @@ memory allocators*" and so requires at least Python 3.4.
 * `pyfailmalloc at the Python Cheeseshop (PyPI)
   <http://pypi.python.org/pypi/pyfailmalloc>`_
 * `pyfailmalloc project at Bitbucket (source code)
-  <https://bitbucket.org/haypo/pyfailmalloc>`_
+  <https://bitbucket.org/vstinner/pyfailmalloc>`_
 
 
 API
