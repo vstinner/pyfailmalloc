@@ -2,6 +2,10 @@
 pyfailmalloc
 ++++++++++++
 
+.. image:: http://unmaintained.tech/badge.svg
+   :target: http://unmaintained.tech/
+   :alt: No Maintenance Intended
+
 Debug tool for Python injecting memory allocation faults to simulate a low
 memory system to test how your application handles ``MemoryError`` exceptions.
 
