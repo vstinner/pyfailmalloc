@@ -54,7 +54,7 @@ def main():
         'license': 'MIT license',
         'description': 'inject memory allocation faults',
         'long_description': long_description,
-        'url': 'https://bitbucket.org/vstinner/pyfailmalloc',
+        'url': 'https://github.com/vstinner/pyfailmalloc',
         'author': 'Victor Stinner',
         'author_email': 'victor.stinner@gmail.com',
         'ext_modules': [ext],
