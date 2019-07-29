@@ -13,8 +13,6 @@ pyfailmalloc is based on the `PEP 445
 <http://www.python.org/dev/peps/pep-0445/>`_ "*Add new APIs to customize Python
 memory allocators*" and so requires at least Python 3.4.
 
-* `pyfailmalloc at the Python Cheeseshop (PyPI)
-  <http://pypi.python.org/pypi/pyfailmalloc>`_
 * `pyfailmalloc project at Bitbucket (source code)
   <https://bitbucket.org/vstinner/pyfailmalloc>`_
 
